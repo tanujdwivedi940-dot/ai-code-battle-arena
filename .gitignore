@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Secrets & Environment Variables (Private keys & API keys)
+.env
+.env.local
+.env*.local
+*.env
+
+# Next.js Build
+frontend/.next/
+.next/
+out/
+
+# Hardhat Build Cache
+contracts/artifacts/
+contracts/cache/
+artifacts/
+cache/
+
+# Logs & OS files
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
