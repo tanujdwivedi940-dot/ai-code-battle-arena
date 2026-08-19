@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { Swords, Trophy, User } from 'lucide-react';
+import { Swords, Trophy, User, Layers } from 'lucide-react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount } from 'wagmi';
 
@@ -33,6 +33,10 @@ export default function Navbar() {
             <Link href="/" className="text-gray-300 hover:text-arena-neonCyan text-sm font-medium transition">
               Arena
             </Link>
+            <Link href="/skills" className="flex items-center space-x-1.5 text-gray-300 hover:text-arena-neonCyan text-sm font-medium transition">
+              <Layers className="w-4 h-4 text-arena-neonCyan" />
+              <span>Skills & Topics</span>
+            </Link>
             <Link href="/leaderboard" className="flex items-center space-x-1.5 text-gray-300 hover:text-arena-neonPurple text-sm font-medium transition">
               <Trophy className="h-4 w-4" />
               <span>Leaderboard</span>
@@ -48,7 +52,7 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Real RainbowKit Connect Button */}
+          {/* RainbowKit Connect Button */}
           <div className="flex items-center">
             <ConnectButton 
               accountStatus="avatar"

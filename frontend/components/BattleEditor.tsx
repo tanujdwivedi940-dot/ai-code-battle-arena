@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from 'react';
 import Editor from '@monaco-editor/react';
-import { Lock, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Lock, CheckCircle2, ChevronDown, ShieldAlert, EyeOff, Volume2 } from 'lucide-react';
+import { sfx } from '@/utils/soundEffects';
 
 export const SUPPORTED_LANGUAGES = [
   { id: 'c', name: 'C', monaco: 'c' },
@@ -20,6 +22,7 @@ interface BattleEditorProps {
   onChange?: (code: string) => void;
   readOnly?: boolean;
   isSubmitted?: boolean;
+  isBlurred?: boolean;
   accentColor?: 'cyan' | 'purple';
 }
 
@@ -31,34 +34,63 @@ export default function BattleEditor({
   onChange,
   readOnly = false,
   isSubmitted = false,
+  isBlurred = false,
   accentColor = 'cyan',
 }: BattleEditorProps) {
   const isCyan = accentColor === 'cyan';
+  const [mechSwitch, setMechSwitch] = useState<'thock' | 'clicky' | 'linear' | 'off'>('thock');
+
+  const handleEditorChange = (val: string | undefined) => {
+    const text = val || '';
+    if (!readOnly && !isSubmitted) {
+      sfx.playMechKeyClick(mechSwitch);
+    }
+    onChange?.(text);
+  };
 
   return (
-    <div className={`flex flex-col h-[530px] rounded-2xl bg-arena-card border ${isCyan ? 'border-arena-neonCyan/40 glow-cyan' : 'border-arena-neonPurple/40 glow-purple'} overflow-hidden shadow-2xl transition-all`}>
-      {/* Editor top toolbar */}
+    <div className={`flex flex-col h-[530px] rounded-2xl bg-arena-card border ${isCyan ? 'border-arena-neonCyan/40 glow-cyan' : 'border-arena-neonPurple/40 glow-purple'} overflow-hidden shadow-2xl transition-all relative`}>
+      
+      {/* Editor Top Toolbar */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-arena-bg border-b border-arena-border">
         <div className="flex items-center space-x-2 font-mono text-xs">
           <div className={`w-2.5 h-2.5 rounded-full ${isCyan ? 'bg-arena-neonCyan' : 'bg-arena-neonPurple'}`} />
           <span className="font-bold text-gray-200">{title}</span>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2.5">
+          {/* Mechanical Keyboard Switch Selector */}
+          {!readOnly && !isSubmitted && (
+            <div className="flex items-center space-x-1 bg-arena-card border border-arena-border px-2 py-0.5 rounded-lg text-[10px] font-mono text-gray-400">
+              <span>⌨️</span>
+              <select
+                value={mechSwitch}
+                onChange={(e) => setMechSwitch(e.target.value as any)}
+                className="bg-transparent text-arena-neonCyan focus:outline-none cursor-pointer"
+              >
+                <option value="thock" className="bg-arena-card">Thock Switch</option>
+                <option value="clicky" className="bg-arena-card">Blue Clicky</option>
+                <option value="linear" className="bg-arena-card">Red Linear</option>
+                <option value="off" className="bg-arena-card">Mute Keys</option>
+              </select>
+            </div>
+          )}
+
+          {isBlurred && (
+            <span className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-0.5 rounded bg-arena-neonPurple/20 text-arena-neonPurple border border-arena-neonPurple/30 font-bold">
+              <EyeOff className="w-3 h-3" />
+              <span>ANTI-CHEAT</span>
+            </span>
+          )}
+
           {isSubmitted && (
             <span className="inline-flex items-center space-x-1 text-[11px] font-mono px-2 py-0.5 rounded bg-arena-neonGreen/20 text-arena-neonGreen border border-arena-neonGreen/30">
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>SUBMITTED</span>
             </span>
           )}
-          {readOnly && (
-            <span className="inline-flex items-center space-x-1 text-[11px] font-mono px-2 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
-              <Lock className="w-3 h-3" />
-              <span>LOCKED</span>
-            </span>
-          )}
 
-          {/* Language Selector Dropdown */}
+          {/* Language Selector */}
           {!readOnly && !isSubmitted ? (
             <div className="relative">
               <select
@@ -82,31 +114,47 @@ export default function BattleEditor({
         </div>
       </div>
 
-      {/* Monaco code area */}
-      <div className="flex-1 relative">
-        <Editor
-          height="100%"
-          language={SUPPORTED_LANGUAGES.find((l) => l.id === language)?.monaco || 'c'}
-          theme="vs-dark"
-          value={code}
-          onChange={(val) => onChange?.(val || '')}
-          options={{
-            readOnly: readOnly || isSubmitted,
-            minimap: { enabled: false },
-            fontSize: 13,
-            lineNumbers: 'on',
-            scrollBeyondLastLine: false,
-            automaticLayout: true,
-            tabSize: 2,
-            fontFamily: "'Fira Code', 'Courier New', monospace",
-            formatOnPaste: true,
-            padding: { top: 12 },
-          }}
-        />
+      {/* Monaco Code Area */}
+      <div className="flex-1 relative overflow-hidden">
+        <div className={`h-full ${isBlurred ? 'filter blur-[7px] select-none pointer-events-none opacity-30 transition-all duration-500' : ''}`}>
+          <Editor
+            height="100%"
+            language={SUPPORTED_LANGUAGES.find((l) => l.id === language)?.monaco || 'c'}
+            theme="vs-dark"
+            value={code}
+            onChange={handleEditorChange}
+            options={{
+              readOnly: readOnly || isSubmitted || isBlurred,
+              minimap: { enabled: false },
+              fontSize: 13,
+              lineNumbers: 'on',
+              scrollBeyondLastLine: false,
+              automaticLayout: true,
+              tabSize: 2,
+              fontFamily: "'Fira Code', 'Courier New', monospace",
+              formatOnPaste: true,
+              padding: { top: 12 },
+            }}
+          />
+        </div>
 
-        {/* Lock Overlay when submitted */}
-        {isSubmitted && (
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
+        {/* Anti-Cheat Overlay */}
+        {isBlurred && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center z-20 pointer-events-none select-none">
+            <div className="p-3.5 rounded-2xl bg-arena-card/90 border border-arena-neonPurple/60 text-arena-neonPurple glow-purple mb-3 animate-pulse shadow-2xl">
+              <ShieldAlert className="w-8 h-8 mx-auto text-arena-neonPurple" />
+            </div>
+            <h4 className="font-mono font-bold text-gray-100 text-sm tracking-wider uppercase mb-1">
+              Fog of War Anti-Cheat Active
+            </h4>
+            <p className="text-[11px] font-mono text-gray-400 max-w-xs leading-relaxed">
+              Opponent code stream is obfuscated during live combat. Keystrokes & velocity stay synced.
+            </p>
+          </div>
+        )}
+
+        {isSubmitted && !isBlurred && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center pointer-events-none z-10">
             <div className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-arena-card/90 border border-arena-border text-gray-300 font-mono text-sm shadow-2xl">
               <Lock className="w-4 h-4 text-arena-neonGreen" />
               <span>Solution locked for AI evaluation</span>

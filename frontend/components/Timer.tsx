@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { Clock, AlertTriangle } from 'lucide-react';
+import { Clock, AlertTriangle, Infinity as InfinityIcon } from 'lucide-react';
 
 interface TimerProps {
   initialSeconds?: number;
@@ -10,10 +10,15 @@ interface TimerProps {
 }
 
 export default function Timer({ initialSeconds = 300, onTimeUp, isLocked }: TimerProps) {
+  const isUnlimited = !initialSeconds || initialSeconds <= 0;
   const [timeLeft, setTimeLeft] = useState(initialSeconds);
 
   useEffect(() => {
-    if (isLocked || timeLeft <= 0) return;
+    setTimeLeft(initialSeconds);
+  }, [initialSeconds]);
+
+  useEffect(() => {
+    if (isUnlimited || isLocked || timeLeft <= 0) return;
 
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
@@ -27,7 +32,17 @@ export default function Timer({ initialSeconds = 300, onTimeUp, isLocked }: Time
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timeLeft, isLocked, onTimeUp]);
+  }, [timeLeft, isLocked, isUnlimited, onTimeUp]);
+
+  // ♾️ UNLIMITED NO-TIMER MODE
+  if (isUnlimited) {
+    return (
+      <div className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl border border-arena-neonCyan/40 bg-arena-neonCyan/10 text-arena-neonCyan font-mono font-bold text-xs shadow-md glow-cyan">
+        <InfinityIcon className="w-4 h-4 text-arena-neonCyan animate-pulse" />
+        <span>NO TIMER (UNLIMITED)</span>
+      </div>
+    );
+  }
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;

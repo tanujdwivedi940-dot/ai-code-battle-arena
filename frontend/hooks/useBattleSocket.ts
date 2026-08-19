@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Reaction } from '@/components/FloatingReactions';
 import { sfx } from '@/utils/soundEffects';
@@ -10,6 +10,7 @@ export interface Player {
   slot: 'player1' | 'player2';
   walletAddress: string;
   ready: boolean;
+  isBot?: boolean;
   code: string;
   language: string;
   submitted: boolean;
@@ -32,32 +33,58 @@ export interface CommentaryMessage {
 
 export function getStarterTemplate(problem: Problem | null, lang: string): string {
   if (!problem) return '';
+  const titleLower = (problem.title || '').toLowerCase();
+  const idLower = (problem.id || '').toLowerCase();
   const funcName = problem.title.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
 
-  switch (lang) {
-    case 'c':
-      return `#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n#include <string.h>\n\n// Write your ${problem.title} solution in C\nint* ${funcName}(int* nums, int numsSize, int target, int* returnSize) {\n    *returnSize = 0;\n    return NULL;\n}\n`;
-    case 'cpp':
-      return `#include <iostream>\n#include <vector>\n#include <unordered_map>\nusing namespace std;\n\nclass Solution {\npublic:\n    // Write your ${problem.title} solution in C++\n};\n`;
-    case 'python':
-      return `def ${funcName}(*args):\n    # Write your ${problem.title} solution in Python 3\n    pass\n`;
-    case 'java':
-      return `import java.util.*;\n\nclass Solution {\n    // Write your ${problem.title} solution in Java\n}\n`;
-    case 'typescript':
-      return `function ${funcName}(...args: any[]): any {\n  // Write your ${problem.title} solution in TypeScript\n}\n`;
-    case 'javascript':
-    default:
-      return problem.starterCode;
+  if (lang === 'c') {
+    if (titleLower.includes('binary search') || idLower.includes('binary-search')) {
+      return `#include <stdio.h>\n#include <stdlib.h>\n\n// Problem: Binary Search\nint search(int* nums, int numsSize, int target) {\n    int left = 0;\n    int right = numsSize - 1;\n    // Write your O(log n) binary search in C\n    \n    return -1;\n}\n`;
+    }
+    if (titleLower.includes('parentheses') || titleLower.includes('valid')) {
+      return `#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n#include <string.h>\n\n// Problem: ${problem.title}\nbool isValid(char* s) {\n    // Write your solution in C\n    return false;\n}\n`;
+    }
+    if (titleLower.includes('list') || titleLower.includes('linked')) {
+      return `#include <stdio.h>\n#include <stdlib.h>\n\nstruct ListNode {\n    int val;\n    struct ListNode *next;\n};\n\nstruct ListNode* reverseList(struct ListNode* head) {\n    // Write your solution in C\n    return NULL;\n}\n`;
+    }
+    return `#include <stdio.h>\n#include <stdlib.h>\n#include <stdbool.h>\n\nint* solution(int* nums, int numsSize, int* returnSize) {\n    *returnSize = 0;\n    return NULL;\n}\n`;
   }
+
+  if (lang === 'python') {
+    return `class Solution:\n    def ${funcName}(self, *args):\n        # Write your ${problem.title} solution in Python 3\n        pass\n`;
+  }
+
+  if (lang === 'java') {
+    if (titleLower.includes('binary search') || idLower.includes('binary-search')) {
+      return `class Solution {\n    public int search(int[] nums, int target) {\n        // Write your Java solution here\n        return -1;\n    }\n}\n`;
+    }
+    return `import java.util.*;\n\nclass Solution {\n    public void solve() {\n        // Write your Java solution here\n    }\n}\n`;
+  }
+
+  if (lang === 'cpp') {
+    if (titleLower.includes('binary search') || idLower.includes('binary-search')) {
+      return `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    int search(vector<int>& nums, int target) {\n        // Write your C++ solution\n        return -1;\n    }\n};\n`;
+    }
+    return `#include <iostream>\n#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    // Write your solution\n};\n`;
+  }
+
+  return problem.starterCode || `function ${funcName}(...args) {\n  // Write your solution here\n\n}`;
 }
 
-export function useBattleSocket(roomId: string, walletAddress?: string, requestedRole?: string) {
+export function useBattleSocket(
+  roomId: string,
+  walletAddress?: string,
+  requestedRole?: string,
+  problemId?: string
+) {
   const [socketId, setSocketId] = useState<string>('');
   const [isSpectator, setIsSpectator] = useState<boolean>(requestedRole === 'spectator');
   const [spectatorCount, setSpectatorCount] = useState<number>(0);
   const [players, setPlayers] = useState<Player[]>([]);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [battleState, setBattleState] = useState<'waiting' | 'in-progress' | 'judging' | 'completed'>('waiting');
+  const [persona, setPersonaState] = useState<string>('esports');
+  const [durationSeconds, setDurationSeconds] = useState<number>(300);
 
   const [myLanguage, setMyLanguageState] = useState<string>('c');
   const [opponentLanguage, setOpponentLanguage] = useState<string>('c');
@@ -68,7 +95,14 @@ export function useBattleSocket(roomId: string, walletAddress?: string, requeste
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [result, setResult] = useState<any>(null);
 
+  const myCodeRef = useRef<string>('');
+  const myLanguageRef = useRef<string>('c');
   const socketRef = useRef<Socket | null>(null);
+  const initializedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    myLanguageRef.current = myLanguage;
+  }, [myLanguage]);
 
   useEffect(() => {
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
@@ -77,32 +111,50 @@ export function useBattleSocket(roomId: string, walletAddress?: string, requeste
 
     socket.on('connect', () => {
       setSocketId(socket.id || '');
-      socket.emit('join_room', { roomId, walletAddress, language: myLanguage, role: requestedRole });
+      socket.emit('join_room', {
+        roomId,
+        walletAddress,
+        language: myLanguageRef.current,
+        role: requestedRole,
+        problemId: problemId,
+        persona: persona,
+      });
     });
 
-    socket.on('spectator_joined', () => {
-      setIsSpectator(true);
-    });
+    socket.on('spectator_joined', () => setIsSpectator(true));
 
     socket.on('room_state', (data) => {
       setPlayers(data.players || []);
       setProblem(data.problem || null);
       setSpectatorCount(data.spectatorCount || 0);
       setBattleState(data.battleState || 'waiting');
+      if (data.persona) setPersonaState(data.persona);
+      if (data.durationSeconds) setDurationSeconds(data.durationSeconds);
       if (data.result) setResult(data.result);
 
-      if (data.problem && !myCode) {
-        setMyCode(getStarterTemplate(data.problem, myLanguage));
+      if (data.problem && !initializedRef.current) {
+        initializedRef.current = true;
+        const initialTemplate = getStarterTemplate(data.problem, myLanguageRef.current);
+        myCodeRef.current = initialTemplate;
+        setMyCode(initialTemplate);
         setOpponentCode(getStarterTemplate(data.problem, 'c'));
       }
     });
 
+    socket.on('duration_updated', (data) => {
+      setDurationSeconds(data.durationSeconds);
+    });
+
+    socket.on('persona_updated', (data) => {
+      setPersonaState(data.persona);
+    });
+
     socket.on('battle_start', (data) => {
       setProblem(data.problem);
-      setMyCode(getStarterTemplate(data.problem, myLanguage));
-      setOpponentCode(getStarterTemplate(data.problem, opponentLanguage));
+      if (data.durationSeconds) setDurationSeconds(data.durationSeconds);
       setBattleState('in-progress');
-      sfx.playFightStart(); // 🥊 Play Arcade Fight Siren!
+      sfx.playFightStart();
+      sfx.startBattleMusic(100);
     });
 
     socket.on('opponent_code_update', (data) => {
@@ -113,57 +165,77 @@ export function useBattleSocket(roomId: string, walletAddress?: string, requeste
       setOpponentLanguage(data.language);
     });
 
-    // Standard Public Commentary
     socket.on('ai_commentary', (message: CommentaryMessage) => {
       setCommentary((prev) => [...prev, { ...message, isTactical: false }]);
     });
 
-    // 🔒 Secret Spectator-Only Grandmaster Tactical Commentary
     socket.on('spectator_tactical_commentary', (message: CommentaryMessage) => {
       setCommentary((prev) => [...prev, { ...message, isTactical: true }]);
     });
 
-    // Floating Emoji Reactions
     socket.on('floating_reaction', (reaction: Reaction) => {
       setReactions((prev) => [...prev, reaction]);
     });
 
     socket.on('battle_judging_started', () => {
       setBattleState('judging');
+      sfx.stopBattleMusic();
     });
 
     socket.on('battle_completed', (data) => {
       setResult(data.result);
       setBattleState('completed');
-      sfx.playVictory(); // 🏆 Play Victory Sound!
+      sfx.stopBattleMusic();
     });
 
     return () => {
+      sfx.stopBattleMusic();
       socket.disconnect();
     };
-  }, [roomId, walletAddress, requestedRole]);
+  }, [roomId, walletAddress, requestedRole, problemId, persona]);
 
-  const sendReady = () => {
-    socketRef.current?.emit('player_ready', { roomId });
+  const sendReady = () => socketRef.current?.emit('player_ready', { roomId });
+
+  const setMatchDuration = (minutes: number) => {
+    socketRef.current?.emit('set_duration', { roomId, durationMinutes: minutes });
+  };
+
+  const spawnBot = (difficulty: 'noob' | 'intermediate' | 'grandmaster') => {
+    socketRef.current?.emit('spawn_bot', { roomId, difficulty });
+  };
+
+  const changePersona = (newPersona: string) => {
+    setPersonaState(newPersona);
+    socketRef.current?.emit('change_persona', { roomId, persona: newPersona });
   };
 
   const setMyLanguage = (lang: string) => {
     setMyLanguageState(lang);
+    myLanguageRef.current = lang;
     if (problem) {
-      setMyCode(getStarterTemplate(problem, lang));
+      const template = getStarterTemplate(problem, lang);
+      myCodeRef.current = template;
+      setMyCode(template);
+      socketRef.current?.emit('code_update', { roomId, code: template, language: lang });
     }
     socketRef.current?.emit('language_change', { roomId, language: lang });
   };
 
-  const sendCodeUpdate = (code: string) => {
+  const sendCodeUpdate = useCallback((code: string) => {
+    myCodeRef.current = code;
     setMyCode(code);
-    socketRef.current?.emit('code_update', { roomId, code, language: myLanguage });
-  };
+    socketRef.current?.emit('code_update', { roomId, code, language: myLanguageRef.current });
+  }, [roomId]);
 
-  const submitCode = () => {
-    sfx.playSubmitSound(); // 🔒 Play Submit Chime
-    socketRef.current?.emit('submit_code', { roomId, code: myCode, language: myLanguage });
-  };
+  const submitCode = useCallback(() => {
+    const finalCode = myCodeRef.current || myCode;
+    sfx.playSubmitSound();
+    socketRef.current?.emit('submit_code', {
+      roomId,
+      code: finalCode,
+      language: myLanguageRef.current,
+    });
+  }, [roomId, myCode]);
 
   const sendReaction = (emoji: string) => {
     socketRef.current?.emit('send_reaction', { roomId, emoji });
@@ -176,8 +248,11 @@ export function useBattleSocket(roomId: string, walletAddress?: string, requeste
     players,
     problem,
     battleState,
+    persona,
+    durationSeconds,
     myLanguage,
     opponentLanguage,
+    setMatchDuration,
     setMyLanguage,
     myCode,
     opponentCode,
@@ -185,6 +260,8 @@ export function useBattleSocket(roomId: string, walletAddress?: string, requeste
     reactions,
     result,
     sendReady,
+    spawnBot,
+    changePersona,
     sendCodeUpdate,
     submitCode,
     sendReaction,
