@@ -15,12 +15,10 @@ interface IReputationNFT {
 
 /**
  * @title BattleArena
- * @dev Manages 1v1 staking, escrows testnet POL/MATIC, and pays out the AI-verified winner.
+ * @dev Manages 1v1 micro-stakes escrow on Polygon Amoy and pays out the AI-verified winner.
  */
 contract BattleArena is Ownable, ReentrancyGuard {
     IReputationNFT public reputationNFT;
-
-    // Backend oracle wallet authorized to verify AI judge results
     address public refereeSigner;
 
     struct Battle {
@@ -38,6 +36,7 @@ contract BattleArena is Ownable, ReentrancyGuard {
 
     event BattleStaked(string indexed roomId, address indexed player, uint256 amount);
     event BattleSettled(string indexed roomId, address indexed winner, uint256 totalPayout);
+    event BattleRefunded(string indexed roomId, address indexed player, uint256 refundAmount);
 
     constructor(address _refereeSigner) Ownable(msg.sender) {
         refereeSigner = _refereeSigner;
@@ -52,10 +51,10 @@ contract BattleArena is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Players stake testnet POL into the battle room escrow.
+     * @dev Player deposits stake into room escrow (e.g. 0.005 POL).
      */
     function stake(string memory roomId) external payable nonReentrant {
-        require(msg.value > 0, "Stake amount must be greater than 0");
+        require(msg.value > 0, "Stake must be greater than 0");
         Battle storage b = battles[roomId];
 
         if (b.player1 == address(0)) {
@@ -64,19 +63,19 @@ contract BattleArena is Ownable, ReentrancyGuard {
             b.stakeAmount = msg.value;
             b.player1Staked = true;
         } else if (b.player2 == address(0)) {
-            require(msg.sender != b.player1, "Cannot play against yourself");
-            require(msg.value == b.stakeAmount, "Stake amount must match Player 1");
+            require(msg.sender != b.player1, "Cannot play against yourself in same slot");
+            require(msg.value == b.stakeAmount, "Stake must match Player 1 amount");
             b.player2 = msg.sender;
             b.player2Staked = true;
         } else {
-            revert("Battle room is already full");
+            revert("Battle room escrow is full");
         }
 
         emit BattleStaked(roomId, msg.sender, msg.value);
     }
 
     /**
-     * @dev Backend referee wallet or contract owner releases the pot to the AI-verified winner.
+     * @dev Settles the battle and transfers the entire pooled pot (2x stake) to the winner.
      */
     function settleBattle(
         string memory roomId,
@@ -85,36 +84,38 @@ contract BattleArena is Ownable, ReentrancyGuard {
         uint256 winnerScore,
         string memory tokenUri
     ) external nonReentrant {
-        require(msg.sender == refereeSigner || msg.sender == owner(), "Only referee can settle battle");
+        require(msg.sender == refereeSigner || msg.sender == owner(), "Only referee can settle payout");
         Battle storage b = battles[roomId];
         require(!b.isSettled, "Battle already settled");
-        require(b.player1Staked, "No stakes deposited");
+        require(b.player1Staked, "No stakes found in escrow");
 
         b.isSettled = true;
         b.winner = winner;
 
         uint256 totalPool = b.player2Staked ? b.stakeAmount * 2 : b.stakeAmount;
 
-        // Payout winner
-        (bool sent, ) = winner.call{value: totalPool}("");
-        require(sent, "Payout transfer failed");
+        // 💰 Transfer total pot directly to winner's wallet
+        if (winner != address(0) && totalPool > 0) {
+            (bool sent, ) = winner.call{value: totalPool}("");
+            require(sent, "Payout transfer failed");
+        }
 
-        // Mint Soulbound Badge if NFT contract is configured
-        if (address(reputationNFT) != address(0)) {
-            reputationNFT.mintWinnerBadge(winner, tokenUri, problemTitle, winnerScore);
+        // 🎖️ Mint Soulbound NFT if configured
+        if (address(reputationNFT) != address(0) && winner != address(0)) {
+            try reputationNFT.mintWinnerBadge(winner, tokenUri, problemTitle, winnerScore) {} catch {}
         }
 
         emit BattleSettled(roomId, winner, totalPool);
     }
 
     /**
-     * @dev Emergency refund in case the opponent disconnects or battle is cancelled.
+     * @dev Emergency refund if opponent does not join.
      */
     function refund(string memory roomId) external nonReentrant {
         Battle storage b = battles[roomId];
         require(!b.isSettled, "Battle already settled");
         require(msg.sender == b.player1 || msg.sender == b.player2, "Not a participant");
-        require(!b.player2Staked, "Match in progress: both players staked");
+        require(!b.player2Staked, "Cannot refund: match is in progress with both players staked");
 
         b.isSettled = true;
         uint256 amount = b.stakeAmount;
@@ -122,5 +123,12 @@ contract BattleArena is Ownable, ReentrancyGuard {
 
         (bool sent, ) = payable(msg.sender).call{value: amount}("");
         require(sent, "Refund failed");
+
+        emit BattleRefunded(roomId, msg.sender, amount);
+    }
+
+    // View helper
+    function getBattle(string memory roomId) external view returns (Battle memory) {
+        return battles[roomId];
     }
 }

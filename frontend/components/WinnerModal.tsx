@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { 
   Trophy, 
   Sparkles, 
@@ -20,11 +21,16 @@ import {
   HardDrive,
   ShieldAlert,
   Swords,
-  Code2
+  Code2,
+  ExternalLink,
+  Loader2,
+  Coins,
+  Award
 } from 'lucide-react';
 import Link from 'next/link';
 import { triggerPartyPopper, triggerSadDefeatAnimation } from '@/utils/confetti';
 import { sfx } from '@/utils/soundEffects';
+import { REPUTATION_NFT_ADDRESS, REPUTATION_NFT_ABI } from '@/config/contracts';
 
 interface PlayerScore {
   address: string;
@@ -47,6 +53,8 @@ interface BattleResult {
   winnerAddress: string;
   reasoning: string;
   comparisonAnalysis?: string;
+  payoutTxHash?: string;
+  payoutAmount?: string;
   scores: {
     player1: PlayerScore;
     player2: PlayerScore;
@@ -73,10 +81,13 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
   const [copiedMyCode, setCopiedMyCode] = useState(false);
   const [copiedOpponentCode, setCopiedOpponentCode] = useState(false);
 
+  const { address } = useAccount();
+  const { writeContract, data: txHash, isPending: isMinting } = useWriteContract();
+  const { isLoading: isWaitingForTx, isSuccess: isMintSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+
   const p1 = result.scores.player1;
   const p2 = result.scores.player2;
 
-  // Exact slot resolution
   const isP1Me = mySlot === 'player1' || (!mySlot && userAddress && p1.address.toLowerCase() === userAddress.toLowerCase());
   const myScore = isP1Me ? p1 : p2;
   const opponentScore = isP1Me ? p2 : p1;
@@ -86,6 +97,8 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
     (userAddress && result.winnerAddress.toLowerCase() === userAddress.toLowerCase()) ||
     (mySlot && result.winnerAddress.toLowerCase() === myScore.address.toLowerCase())
   );
+
+  const hasRealPayout = parseFloat(result.payoutAmount || '0') > 0;
 
   useEffect(() => {
     if (isUserWinner) {
@@ -97,6 +110,26 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
       sfx.playDefeat();
     }
   }, [isUserWinner, isDraw]);
+
+  // Mint Soulbound NFT
+  const handleClaimSoulboundBadge = () => {
+    if (!address) return;
+    try {
+      writeContract({
+        address: REPUTATION_NFT_ADDRESS,
+        abi: REPUTATION_NFT_ABI,
+        functionName: 'mintWinnerBadge',
+        args: [
+          address,
+          `ipfs://badge/${result.scores.player1.total}`,
+          '1v1 Algorithmic Battle Arena',
+          BigInt(myScore.total || 90)
+        ],
+      });
+    } catch (err) {
+      console.error('Minting error:', err);
+    }
+  };
 
   const copyText = (text: string, type: 'optimal' | 'my' | 'opp') => {
     navigator.clipboard.writeText(text);
@@ -156,11 +189,58 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
             {isDraw ? 'Result: Tied Match' : `Winner: ${result.winnerAddress}`}
           </p>
 
-          <p className="text-xs text-gray-400 mt-2 italic bg-arena-bg px-4 py-2 rounded-xl border border-arena-border inline-block max-w-xl">
+          {/* 🎖️ REWARD CLAIM BANNER */}
+          {isUserWinner && (
+            <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-yellow-500/15 via-arena-neonGreen/15 to-arena-neonCyan/15 border border-yellow-500/40 shadow-xl max-w-xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-left font-mono">
+              <div>
+                <div className="flex items-center space-x-2 text-yellow-400 text-sm font-extrabold">
+                  {hasRealPayout ? <Coins className="w-4 h-4" /> : <Award className="w-4 h-4" />}
+                  <span>
+                    {hasRealPayout
+                      ? `+${result.payoutAmount} POL Prize Pool Released!`
+                      : '🏆 Victory Badge Unlocked!'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  {hasRealPayout
+                    ? 'Smart contract escrow settled.'
+                    : 'Claim your non-transferable Soulbound NFT on Polygon Amoy.'}
+                </p>
+              </div>
+
+              {/* Soulbound Badge Claim */}
+              {isMintSuccess ? (
+                <span className="text-arena-neonGreen text-xs font-bold flex items-center space-x-1">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>NFT Badge Minted!</span>
+                </span>
+              ) : (
+                <button
+                  onClick={handleClaimSoulboundBadge}
+                  disabled={isMinting || isWaitingForTx}
+                  className="px-4 py-2 bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
+                >
+                  {isMinting || isWaitingForTx ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Minting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Award className="w-3.5 h-3.5" />
+                      <span>Claim Soulbound NFT</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+
+          <p className="text-xs text-gray-400 mt-3 italic bg-arena-bg px-4 py-2 rounded-xl border border-arena-border inline-block max-w-xl">
             "{result.highlightQuote}"
           </p>
 
-          {/* Navigation Tabs (Including Code Inspector) */}
+          {/* Navigation Tabs */}
           <div className="flex justify-center mt-5">
             <div className="bg-arena-bg border border-arena-border p-1 rounded-xl flex flex-wrap gap-1 font-mono text-xs">
               <button
@@ -173,7 +253,6 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                 <span>Marks & Scores</span>
               </button>
 
-              {/* 💻 NEW: Code Inspector Tab */}
               <button
                 onClick={() => setActiveTab('viewCodes')}
                 className={`px-3 py-1.5 rounded-lg transition flex items-center space-x-1.5 ${
@@ -341,12 +420,10 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
           </div>
         )}
 
-        {/* 💻 TAB 2: SIDE-BY-SIDE SUBMISSION CODE INSPECTOR */}
+        {/* TAB 2: VIEW SUBMISSION CODES */}
         {activeTab === 'viewCodes' && (
           <div className="space-y-4 pt-6 text-left font-mono">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
-              {/* YOUR SUBMITTED CODE */}
               <div className="bg-arena-bg border border-arena-border rounded-2xl p-4 flex flex-col justify-between">
                 <div className="flex items-center justify-between pb-2 border-b border-arena-border mb-3">
                   <div className="flex items-center space-x-2">
@@ -369,7 +446,6 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                 </div>
               </div>
 
-              {/* OPPONENT'S SUBMITTED CODE */}
               <div className="bg-arena-bg border border-arena-border rounded-2xl p-4 flex flex-col justify-between">
                 <div className="flex items-center justify-between pb-2 border-b border-arena-border mb-3">
                   <div className="flex items-center space-x-2">
@@ -391,12 +467,11 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                   <pre><code>{opponentScore.code || '// No code submitted'}</code></pre>
                 </div>
               </div>
-
             </div>
           </div>
         )}
 
-        {/* TAB 3: MISTAKES & DEDUCTIONS */}
+        {/* TAB 3: MISTAKES & REVIEW */}
         {activeTab === 'codeReview' && (
           <div className="space-y-6 pt-6 text-left font-mono">
             <div className="p-4 bg-arena-neonPurple/10 border border-arena-neonPurple/40 rounded-2xl">
@@ -410,7 +485,6 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Your Deductions */}
               <div className="p-4 bg-arena-bg border border-arena-border rounded-xl space-y-3">
                 <h4 className="text-xs font-bold text-arena-neonCyan flex items-center space-x-1.5">
                   <ShieldAlert className="w-4 h-4" />
@@ -427,20 +501,8 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                     ))}
                   </div>
                 )}
-
-                {myScore.scoreBonuses && myScore.scoreBonuses.length > 0 && (
-                  <div className="space-y-1.5 pt-1">
-                    {myScore.scoreBonuses.map((b, i) => (
-                      <div key={i} className="flex items-start space-x-2 text-xs text-arena-neonGreen">
-                        <PlusCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                        <span>{b}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
-              {/* Opponent Deductions */}
               <div className="p-4 bg-arena-bg border border-arena-border rounded-xl space-y-3">
                 <h4 className="text-xs font-bold text-arena-neonPurple flex items-center space-x-1.5">
                   <ShieldAlert className="w-4 h-4" />
@@ -506,7 +568,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
           </div>
         )}
 
-        {/* Bottom Navigation Actions */}
+        {/* Modal Bottom Actions */}
         <div className="mt-8 pt-4 border-t border-arena-border flex flex-col sm:flex-row gap-3">
           <Link
             href="/"
@@ -518,7 +580,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
             href={userAddress ? `/profile/${userAddress}` : '/leaderboard'}
             className="flex-1 py-3 bg-gradient-to-r from-arena-neonCyan to-arena-neonPurple text-black text-center font-bold text-xs rounded-xl hover:scale-[1.02] transition flex items-center justify-center space-x-2 font-mono shadow-xl glow-cyan"
           >
-            <span>View On-Chain Soulbound Badges</span>
+            <span>View On-Chain Soulbound Profile</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

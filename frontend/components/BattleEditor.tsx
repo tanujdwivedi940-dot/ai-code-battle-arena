@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from 'react';
-import Editor from '@monaco-editor/react';
-import { Lock, CheckCircle2, ChevronDown, ShieldAlert, EyeOff, Volume2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import Editor, { OnMount } from '@monaco-editor/react';
+import { Lock, CheckCircle2, ChevronDown, ShieldAlert, EyeOff, ShieldBan, AlertOctagon } from 'lucide-react';
 import { sfx } from '@/utils/soundEffects';
 
 export const SUPPORTED_LANGUAGES = [
@@ -39,6 +39,16 @@ export default function BattleEditor({
 }: BattleEditorProps) {
   const isCyan = accentColor === 'cyan';
   const [mechSwitch, setMechSwitch] = useState<'thock' | 'clicky' | 'linear' | 'off'>('thock');
+  const [showPasteAlert, setShowPasteAlert] = useState(false);
+  const alertTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 🚫 Trigger Anti-Paste Warning & Sound
+  const triggerPasteWarning = () => {
+    sfx.playBuzzer();
+    setShowPasteAlert(true);
+    if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+    alertTimerRef.current = setTimeout(() => setShowPasteAlert(false), 2800);
+  };
 
   const handleEditorChange = (val: string | undefined) => {
     const text = val || '';
@@ -48,8 +58,46 @@ export default function BattleEditor({
     onChange?.(text);
   };
 
+  // 🛡️ Intercept Keyboard Shortcuts (Ctrl+V, Cmd+V, Shift+Insert) inside Monaco
+  const handleEditorMount: OnMount = (editor, monaco) => {
+    editor.onKeyDown((e) => {
+      // Detect Ctrl+V or Cmd+V (Mac) or Shift+Insert
+      const isCtrlOrMetaV = (e.ctrlKey || e.metaKey) && e.keyCode === monaco.KeyCode.KeyV;
+      const isShiftInsert = e.shiftKey && e.keyCode === monaco.KeyCode.Insert;
+
+      if (isCtrlOrMetaV || isShiftInsert) {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerPasteWarning();
+      }
+    });
+
+    // Override Monaco internal paste action
+    editor.addAction({
+      id: 'block-paste-action',
+      label: 'Paste is Disabled',
+      keybindings: [
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV,
+        monaco.KeyMod.Shift | monaco.KeyCode.Insert,
+      ],
+      run: () => {
+        triggerPasteWarning();
+      },
+    });
+  };
+
   return (
-    <div className={`flex flex-col h-[530px] rounded-2xl bg-arena-card border ${isCyan ? 'border-arena-neonCyan/40 glow-cyan' : 'border-arena-neonPurple/40 glow-purple'} overflow-hidden shadow-2xl transition-all relative`}>
+    <div 
+      onPaste={(e) => {
+        e.preventDefault();
+        triggerPasteWarning();
+      }}
+      onContextMenu={(e) => {
+        // Disables right-click inside the editor container
+        e.preventDefault();
+      }}
+      className={`flex flex-col h-[530px] rounded-2xl bg-arena-card border ${isCyan ? 'border-arena-neonCyan/40 glow-cyan' : 'border-arena-neonPurple/40 glow-purple'} overflow-hidden shadow-2xl transition-all relative select-none`}
+    >
       
       {/* Editor Top Toolbar */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-arena-bg border-b border-arena-border">
@@ -116,15 +164,26 @@ export default function BattleEditor({
 
       {/* Monaco Code Area */}
       <div className="flex-1 relative overflow-hidden">
+        
+        {/* 🚨 Red Flash Anti-Cheat Warning Toast */}
+        {showPasteAlert && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-arena-neonRed/90 border border-red-400 text-white font-mono text-xs px-4 py-2.5 rounded-2xl shadow-2xl flex items-center space-x-2 animate-bounce glow-red">
+            <ShieldBan className="w-4 h-4 text-white shrink-0" />
+            <span className="font-bold">ANTI-CHEAT ALERT: Copy/Paste is disabled in 1v1 Battles! Type your solution.</span>
+          </div>
+        )}
+
         <div className={`h-full ${isBlurred ? 'filter blur-[7px] select-none pointer-events-none opacity-30 transition-all duration-500' : ''}`}>
           <Editor
             height="100%"
             language={SUPPORTED_LANGUAGES.find((l) => l.id === language)?.monaco || 'c'}
             theme="vs-dark"
             value={code}
+            onMount={handleEditorMount}
             onChange={handleEditorChange}
             options={{
               readOnly: readOnly || isSubmitted || isBlurred,
+              contextmenu: false, // 🚫 Disables Monaco right-click context menu
               minimap: { enabled: false },
               fontSize: 13,
               lineNumbers: 'on',
@@ -132,13 +191,13 @@ export default function BattleEditor({
               automaticLayout: true,
               tabSize: 2,
               fontFamily: "'Fira Code', 'Courier New', monospace",
-              formatOnPaste: true,
+              formatOnPaste: false,
               padding: { top: 12 },
             }}
           />
         </div>
 
-        {/* Anti-Cheat Overlay */}
+        {/* Fog of War Overlay */}
         {isBlurred && (
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center z-20 pointer-events-none select-none">
             <div className="p-3.5 rounded-2xl bg-arena-card/90 border border-arena-neonPurple/60 text-arena-neonPurple glow-purple mb-3 animate-pulse shadow-2xl">
@@ -153,6 +212,7 @@ export default function BattleEditor({
           </div>
         )}
 
+        {/* Lock Overlay when Submitted */}
         {isSubmitted && !isBlurred && (
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center pointer-events-none z-10">
             <div className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-arena-card/90 border border-arena-border text-gray-300 font-mono text-sm shadow-2xl">

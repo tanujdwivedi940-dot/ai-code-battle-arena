@@ -16,6 +16,26 @@ class SoundFX {
     return this.ctx;
   }
 
+  // 🚫 Anti-Cheat Warning Buzzer Sound
+  playBuzzer() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(140, ctx.currentTime);
+    osc.frequency.setValueAtTime(100, ctx.currentTime + 0.1);
+
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.25);
+  }
+
   // ⌨️ LOUD & PUNCHY Mechanical Keyboard Synthesizer
   playMechKeyClick(switchType: 'thock' | 'clicky' | 'linear' | 'off' = 'thock') {
     if (switchType === 'off') return;
@@ -24,17 +44,15 @@ class SoundFX {
 
     const now = ctx.currentTime;
 
-    // 1. 🪵 DEEP LOUD ACOUSTIC THOCK (Holy Panda / Topre Style)
     if (switchType === 'thock') {
-      // Body Resonator (Deep hollow thock)
       const bodyOsc = ctx.createOscillator();
       const bodyGain = ctx.createGain();
       bodyOsc.type = 'triangle';
-      const bodyFreq = Math.random() * 40 + 130; // 130Hz - 170Hz deep wooden resonance
+      const bodyFreq = Math.random() * 40 + 130;
       bodyOsc.frequency.setValueAtTime(bodyFreq, now);
       bodyOsc.frequency.exponentialRampToValueAtTime(45, now + 0.07);
 
-      bodyGain.gain.setValueAtTime(0.65, now); // 🔊 Loud presence
+      bodyGain.gain.setValueAtTime(0.65, now);
       bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
 
       bodyOsc.connect(bodyGain);
@@ -42,7 +60,6 @@ class SoundFX {
       bodyOsc.start(now);
       bodyOsc.stop(now + 0.07);
 
-      // Snap Transient (Crisp top-out click)
       const snapOsc = ctx.createOscillator();
       const snapGain = ctx.createGain();
       snapOsc.type = 'sine';
@@ -56,26 +73,22 @@ class SoundFX {
       snapGain.connect(ctx.destination);
       snapOsc.start(now);
       snapOsc.stop(now + 0.02);
-    } 
-    // 2. 🔴 PUNCHY RED LINEAR CLACK
-    else if (switchType === 'linear') {
+    } else if (switchType === 'linear') {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'triangle';
-      const freq = Math.random() * 80 + 340; // 340Hz - 420Hz crisp bottom-out
+      const freq = Math.random() * 80 + 340;
       osc.frequency.setValueAtTime(freq, now);
       osc.frequency.exponentialRampToValueAtTime(90, now + 0.05);
 
-      gain.gain.setValueAtTime(0.55, now); // 🔊 Loud crisp clack
+      gain.gain.setValueAtTime(0.55, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(now);
       osc.stop(now + 0.05);
-    } 
-    // 3. 🔵 SHARP BLUE CLICKY SWITCH
-    else if (switchType === 'clicky') {
+    } else if (switchType === 'clicky') {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'square';

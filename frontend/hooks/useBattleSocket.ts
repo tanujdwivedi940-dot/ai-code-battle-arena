@@ -10,6 +10,7 @@ export interface Player {
   slot: 'player1' | 'player2';
   walletAddress: string;
   ready: boolean;
+  staked?: boolean;
   isBot?: boolean;
   code: string;
   language: string;
@@ -85,6 +86,8 @@ export function useBattleSocket(
   const [battleState, setBattleState] = useState<'waiting' | 'in-progress' | 'judging' | 'completed'>('waiting');
   const [persona, setPersonaState] = useState<string>('esports');
   const [durationSeconds, setDurationSeconds] = useState<number>(300);
+  const [stakeAmount, setStakeAmountState] = useState<string>('0.005');
+  const [isOptimisticallySubmitted, setIsOptimisticallySubmitted] = useState<boolean>(false);
 
   const [myLanguage, setMyLanguageState] = useState<string>('c');
   const [opponentLanguage, setOpponentLanguage] = useState<string>('c');
@@ -111,6 +114,7 @@ export function useBattleSocket(
 
     socket.on('connect', () => {
       setSocketId(socket.id || '');
+      const initialTemplate = problem ? getStarterTemplate(problem, myLanguageRef.current) : '';
       socket.emit('join_room', {
         roomId,
         walletAddress,
@@ -118,6 +122,7 @@ export function useBattleSocket(
         role: requestedRole,
         problemId: problemId,
         persona: persona,
+        starterCode: initialTemplate,
       });
     });
 
@@ -129,8 +134,12 @@ export function useBattleSocket(
       setSpectatorCount(data.spectatorCount || 0);
       setBattleState(data.battleState || 'waiting');
       if (data.persona) setPersonaState(data.persona);
-      if (data.durationSeconds) setDurationSeconds(data.durationSeconds);
+      if (data.durationSeconds !== undefined) setDurationSeconds(data.durationSeconds);
+      if (data.stakeAmount) setStakeAmountState(data.stakeAmount);
       if (data.result) setResult(data.result);
+
+      const isPlayerSeat = (data.players || []).some((p: Player) => p.id === socket.id);
+      if (isPlayerSeat) setIsSpectator(false);
 
       if (data.problem && !initializedRef.current) {
         initializedRef.current = true;
@@ -141,29 +150,21 @@ export function useBattleSocket(
       }
     });
 
-    socket.on('duration_updated', (data) => {
-      setDurationSeconds(data.durationSeconds);
-    });
-
-    socket.on('persona_updated', (data) => {
-      setPersonaState(data.persona);
-    });
+    socket.on('duration_updated', (data) => setDurationSeconds(data.durationSeconds));
+    socket.on('persona_updated', (data) => setPersonaState(data.persona));
 
     socket.on('battle_start', (data) => {
       setProblem(data.problem);
-      if (data.durationSeconds) setDurationSeconds(data.durationSeconds);
+      if (data.durationSeconds !== undefined) setDurationSeconds(data.durationSeconds);
+      if (data.stakeAmount) setStakeAmountState(data.stakeAmount);
       setBattleState('in-progress');
+      setIsOptimisticallySubmitted(false);
       sfx.playFightStart();
       sfx.startBattleMusic(100);
     });
 
-    socket.on('opponent_code_update', (data) => {
-      setOpponentCode(data.code);
-    });
-
-    socket.on('opponent_language_update', (data) => {
-      setOpponentLanguage(data.language);
-    });
+    socket.on('opponent_code_update', (data) => setOpponentCode(data.code));
+    socket.on('opponent_language_update', (data) => setOpponentLanguage(data.language));
 
     socket.on('ai_commentary', (message: CommentaryMessage) => {
       setCommentary((prev) => [...prev, { ...message, isTactical: false }]);
@@ -194,7 +195,14 @@ export function useBattleSocket(
     };
   }, [roomId, walletAddress, requestedRole, problemId, persona]);
 
-  const sendReady = () => socketRef.current?.emit('player_ready', { roomId });
+  const sendReady = (isStaked = false) => {
+    socketRef.current?.emit('player_ready', { roomId, isStaked });
+  };
+
+  const setStakeTier = (amount: string) => {
+    setStakeAmountState(amount);
+    socketRef.current?.emit('set_stake', { roomId, stakeAmount: amount });
+  };
 
   const setMatchDuration = (minutes: number) => {
     socketRef.current?.emit('set_duration', { roomId, durationMinutes: minutes });
@@ -227,15 +235,19 @@ export function useBattleSocket(
     socketRef.current?.emit('code_update', { roomId, code, language: myLanguageRef.current });
   }, [roomId]);
 
+  // ⚡ Passes current starter template alongside submitted code
   const submitCode = useCallback(() => {
     const finalCode = myCodeRef.current || myCode;
+    const currentStarter = problem ? getStarterTemplate(problem, myLanguageRef.current) : '';
+    setIsOptimisticallySubmitted(true);
     sfx.playSubmitSound();
     socketRef.current?.emit('submit_code', {
       roomId,
       code: finalCode,
       language: myLanguageRef.current,
+      starterCode: currentStarter,
     });
-  }, [roomId, myCode]);
+  }, [roomId, myCode, problem]);
 
   const sendReaction = (emoji: string) => {
     socketRef.current?.emit('send_reaction', { roomId, emoji });
@@ -250,8 +262,11 @@ export function useBattleSocket(
     battleState,
     persona,
     durationSeconds,
+    stakeAmount,
     myLanguage,
     opponentLanguage,
+    isOptimisticallySubmitted,
+    setStakeTier,
     setMatchDuration,
     setMyLanguage,
     myCode,
