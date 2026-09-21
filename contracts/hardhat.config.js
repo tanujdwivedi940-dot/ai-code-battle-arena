@@ -20,6 +20,7 @@ module.exports = {
       url: "https://polygon-amoy-bor-rpc.publicnode.com",
       accounts: [PRIVATE_KEY],
       chainId: 80002,
+      gasPrice: 25000000000, // 🔒 Fixed 25 Gwei (Prevents RPC spikes)
     },
   },
 };

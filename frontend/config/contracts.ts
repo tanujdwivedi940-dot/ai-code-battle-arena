@@ -18,6 +18,13 @@ export const BATTLE_ARENA_ABI = [
   },
   {
     "type": "function",
+    "name": "claimPrize",
+    "inputs": [{ "name": "roomId", "type": "string" }],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "settleBattle",
     "inputs": [
       { "name": "roomId", "type": "string" },

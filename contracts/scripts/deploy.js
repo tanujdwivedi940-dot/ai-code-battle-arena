@@ -5,23 +5,20 @@ async function main() {
   const balance = await hre.ethers.provider.getBalance(deployer.address);
 
   console.log(`🚀 Deploying with account: ${deployer.address}`);
-  console.log(`💰 Account Balance: ${hre.ethers.formatEther(balance)} POL`);
+  console.log(`💰 Remaining Balance: ${hre.ethers.formatEther(balance)} POL`);
 
-  // Fetch network fee data to prevent gas spikes
-  const feeData = await hre.ethers.provider.getFeeData();
+  // 1. REUSE the freshly deployed ReputationNFT (already has public claimBadge!)
+  const nftAddress = "0x82758c7962344A06177153586717375d62956277";
+  console.log(`♻️  Using updated ReputationNFT at: ${nftAddress}`);
+  const reputationNFT = await hre.ethers.getContractAt("ReputationNFT", nftAddress);
+
+  // Explicit gas limit to prevent "out of gas"
   const gasOverrides = {
-    gasPrice: feeData.gasPrice || hre.ethers.parseUnits("35", "gwei"),
+    gasPrice: hre.ethers.parseUnits("25", "gwei"),
+    gasLimit: 1400000,
   };
 
-  // 1. Deploy the NEW ReputationNFT (with public claimBadge function)
-  console.log("⏳ Deploying updated ReputationNFT (with public claimBadge)...");
-  const ReputationNFT = await hre.ethers.getContractFactory("ReputationNFT");
-  const reputationNFT = await ReputationNFT.deploy(gasOverrides);
-  await reputationNFT.waitForDeployment();
-  const nftAddress = await reputationNFT.getAddress();
-  console.log(`✅ New ReputationNFT deployed to: ${nftAddress}`);
-
-  // 2. Deploy BattleArena
+  // 2. Deploy BattleArena (Only costs ~0.02 POL)
   console.log("⏳ Deploying BattleArena...");
   const BattleArena = await hre.ethers.getContractFactory("BattleArena");
   const battleArena = await BattleArena.deploy(deployer.address, gasOverrides);
@@ -31,10 +28,18 @@ async function main() {
 
   // 3. Link them together
   console.log("🔗 Linking contracts...");
-  const tx1 = await reputationNFT.setBattleArenaContract(arenaAddress, gasOverrides);
+  const tx1 = await reputationNFT.setBattleArenaContract(arenaAddress, {
+    gasPrice: hre.ethers.parseUnits("25", "gwei"),
+    gasLimit: 100000,
+  });
   await tx1.wait();
-  const tx2 = await battleArena.setReputationNFT(nftAddress, gasOverrides);
+
+  const tx2 = await battleArena.setReputationNFT(nftAddress, {
+    gasPrice: hre.ethers.parseUnits("25", "gwei"),
+    gasLimit: 100000,
+  });
   await tx2.wait();
+
   console.log("🎉 All contracts deployed and linked successfully!");
 
   console.log("\n================ COPY TO FRONTEND ================");

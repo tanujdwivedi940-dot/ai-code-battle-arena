@@ -30,7 +30,12 @@ import {
 import Link from 'next/link';
 import { triggerPartyPopper, triggerSadDefeatAnimation } from '@/utils/confetti';
 import { sfx } from '@/utils/soundEffects';
-import { REPUTATION_NFT_ADDRESS, REPUTATION_NFT_ABI } from '@/config/contracts';
+import { 
+  BATTLE_ARENA_ADDRESS, 
+  BATTLE_ARENA_ABI, 
+  REPUTATION_NFT_ADDRESS, 
+  REPUTATION_NFT_ABI 
+} from '@/config/contracts';
 
 interface PlayerScore {
   address: string;
@@ -82,12 +87,19 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
   const [copiedOpponentCode, setCopiedOpponentCode] = useState(false);
 
   const { address } = useAccount();
-  const { writeContract, data: txHash, isPending: isMinting } = useWriteContract();
-  const { isLoading: isWaitingForTx, isSuccess: isMintSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+
+  // 1. 🎖️ Mint Soulbound NFT Badge Contract Call
+  const { writeContract: writeNftMint, data: nftTxHash, isPending: isMintingNft } = useWriteContract();
+  const { isLoading: isWaitingNftTx, isSuccess: isNftMintSuccess } = useWaitForTransactionReceipt({ hash: nftTxHash });
+
+  // 2. 💰 Withdraw POL Prize Pool from Escrow Contract Call
+  const { writeContract: writePrizeClaim, data: prizeTxHash, isPending: isClaimingPrize } = useWriteContract();
+  const { isLoading: isWaitingPrizeTx, isSuccess: isPrizeClaimSuccess } = useWaitForTransactionReceipt({ hash: prizeTxHash });
 
   const p1 = result.scores.player1;
   const p2 = result.scores.player2;
 
+  // 🔒 100% Exact Slot Resolution
   const isP1Me = mySlot === 'player1' || (!mySlot && userAddress && p1.address.toLowerCase() === userAddress.toLowerCase());
   const myScore = isP1Me ? p1 : p2;
   const opponentScore = isP1Me ? p2 : p1;
@@ -100,6 +112,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
 
   const hasRealPayout = parseFloat(result.payoutAmount || '0') > 0;
 
+  // 🎊 Party Popper for Winner ONLY, 🌧️ Gloomy Rain for Loser
   useEffect(() => {
     if (isUserWinner) {
       triggerPartyPopper();
@@ -111,11 +124,27 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
     }
   }, [isUserWinner, isDraw]);
 
-// ⚡ MINT SOULBOUND NFT BADGE TO WINNER ON POLYGON AMOY
+  // 💰 Withdraw Real POL from Smart Contract Escrow
+  const handleClaimPrizePool = () => {
+    if (!address) return;
+    try {
+      const pathRoomId = window.location.pathname.split('/').pop()?.split('?')[0] || '';
+      writePrizeClaim({
+        address: BATTLE_ARENA_ADDRESS,
+        abi: BATTLE_ARENA_ABI,
+        functionName: 'claimPrize',
+        args: [pathRoomId],
+      });
+    } catch (err) {
+      console.error('Prize withdrawal error:', err);
+    }
+  };
+
+  // 🎖️ Mint Soulbound NFT Badge to Winner's Wallet
   const handleClaimSoulboundBadge = () => {
     if (!address) return;
     try {
-      writeContract({
+      writeNftMint({
         address: REPUTATION_NFT_ADDRESS,
         abi: REPUTATION_NFT_ABI,
         functionName: 'claimBadge',
@@ -126,7 +155,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
         ],
       });
     } catch (err) {
-      console.error('Minting error:', err);
+      console.error('NFT Minting error:', err);
     }
   };
 
@@ -162,7 +191,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
         isUserWinner ? 'border-arena-neonGreen/50 glow-cyan' : isDraw ? 'border-yellow-500/50' : 'border-arena-neonRed/50 glow-red'
       }`}>
         
-        {/* Header Ribbon */}
+        {/* Top Header Banner */}
         <div className="text-center pb-6 border-b border-arena-border">
           <div className="inline-flex p-3 rounded-2xl mb-2 animate-bounce">
             {isUserWinner ? (
@@ -188,7 +217,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
             {isDraw ? 'Result: Tied Match' : `Winner: ${result.winnerAddress}`}
           </p>
 
-          {/* 🎖️ REWARD CLAIM BANNER */}
+          {/* 💰 DUAL REWARD CLAIM BANNER (WITHDRAW POL & SOULBOUND NFT) */}
           {isUserWinner && (
             <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-yellow-500/15 via-arena-neonGreen/15 to-arena-neonCyan/15 border border-yellow-500/40 shadow-xl max-w-xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-left font-mono">
               <div>
@@ -196,42 +225,66 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                   {hasRealPayout ? <Coins className="w-4 h-4" /> : <Award className="w-4 h-4" />}
                   <span>
                     {hasRealPayout
-                      ? `+${result.payoutAmount} POL Prize Pool Released!`
+                      ? `+${result.payoutAmount} POL Prize Pool Available!`
                       : '🏆 Victory Badge Unlocked!'}
                   </span>
                 </div>
                 <p className="text-[11px] text-gray-400 mt-0.5">
-                  {hasRealPayout
-                    ? 'Smart contract escrow settled.'
-                    : 'Claim your non-transferable Soulbound NFT on Polygon Amoy.'}
+                  {isPrizeClaimSuccess
+                    ? '✅ POL prize transferred directly into your MetaMask wallet!'
+                    : hasRealPayout
+                    ? 'Withdraw your 2x pooled stake from the smart contract escrow.'
+                    : 'Claim your verified Soulbound NFT badge on Polygon Amoy.'}
                 </p>
               </div>
 
-              {/* Soulbound Badge Claim */}
-              {isMintSuccess ? (
-                <span className="text-arena-neonGreen text-xs font-bold flex items-center space-x-1">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>NFT Badge Minted!</span>
-                </span>
-              ) : (
-                <button
-                  onClick={handleClaimSoulboundBadge}
-                  disabled={isMinting || isWaitingForTx}
-                  className="px-4 py-2 bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
-                >
-                  {isMinting || isWaitingForTx ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Minting...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Award className="w-3.5 h-3.5" />
-                      <span>Claim Soulbound NFT</span>
-                    </>
-                  )}
-                </button>
-              )}
+              {/* Action Buttons: Withdraw POL + Claim NFT */}
+              <div className="flex items-center space-x-2 shrink-0">
+                {hasRealPayout && !isPrizeClaimSuccess && (
+                  <button
+                    onClick={handleClaimPrizePool}
+                    disabled={isClaimingPrize || isWaitingPrizeTx}
+                    className="px-3.5 py-2 bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isClaimingPrize || isWaitingPrizeTx ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Withdrawing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Coins className="w-3.5 h-3.5" />
+                        <span>Withdraw POL</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {isNftMintSuccess ? (
+                  <span className="text-arena-neonGreen text-xs font-bold flex items-center space-x-1">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>NFT Minted!</span>
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleClaimSoulboundBadge}
+                    disabled={isMintingNft || isWaitingNftTx}
+                    className="px-3.5 py-2 bg-arena-card border border-arena-border hover:border-arena-neonCyan text-arena-neonCyan font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isMintingNft || isWaitingNftTx ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Minting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Award className="w-3.5 h-3.5" />
+                        <span>Claim NFT</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -289,6 +342,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
         {activeTab === 'verdict' && (
           <div className="space-y-6 pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              
               {/* YOUR SCORECARD */}
               <div className={`p-5 rounded-2xl border text-left flex flex-col justify-between ${
                 isUserWinner ? 'bg-arena-neonGreen/5 border-arena-neonGreen/40' : isDraw ? 'bg-arena-bg border-yellow-500/40' : 'bg-arena-bg border-arena-neonRed/40'
@@ -309,7 +363,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                   </div>
 
                   <p className="text-[11px] font-mono text-gray-400 truncate mb-4">
-                    Wallet: {myScore.address} • Tests: <span className="text-arena-neonGreen font-bold">{myScore.testCasesPassed || '8/10 (80%)'}</span>
+                    Wallet: {myScore.address} • Tests: <span className="text-arena-neonGreen font-bold">{myScore.testCasesPassed || '0/10 (0%)'}</span>
                   </p>
 
                   <div className="space-y-3 font-mono text-xs">
@@ -326,20 +380,30 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                     <div>
                       <div className="flex justify-between text-gray-300 mb-1">
                         <span className="flex items-center space-x-1.5"><Cpu className="w-3.5 h-3.5 text-yellow-400" /><span>Time Complexity:</span></span>
-                        <span className="font-bold text-yellow-400">{myScore.timeComplexityScore ?? 20}/25</span>
+                        <span className="font-bold text-yellow-400">{myScore.timeComplexityScore ?? 0}/25</span>
                       </div>
                       <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                        <div className="bg-yellow-400 h-full rounded-full transition-all duration-1000" style={{ width: `${((myScore.timeComplexityScore ?? 20) / 25) * 100}%` }} />
+                        <div className="bg-yellow-400 h-full rounded-full transition-all duration-1000" style={{ width: `${((myScore.timeComplexityScore ?? 0) / 25) * 100}%` }} />
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between text-gray-300 mb-1">
                         <span className="flex items-center space-x-1.5"><HardDrive className="w-3.5 h-3.5 text-arena-neonPurple" /><span>Space & Memory:</span></span>
-                        <span className="font-bold text-arena-neonPurple">{myScore.spaceComplexityScore ?? 12}/15</span>
+                        <span className="font-bold text-arena-neonPurple">{myScore.spaceComplexityScore ?? 0}/15</span>
                       </div>
                       <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                        <div className="bg-arena-neonPurple h-full rounded-full transition-all duration-1000" style={{ width: `${((myScore.spaceComplexityScore ?? 12) / 15) * 100}%` }} />
+                        <div className="bg-arena-neonPurple h-full rounded-full transition-all duration-1000" style={{ width: `${((myScore.spaceComplexityScore ?? 0) / 15) * 100}%` }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-gray-300 mb-1">
+                        <span className="flex items-center space-x-1.5"><FileCode className="w-3.5 h-3.5 text-arena-neonGreen" /><span>Cleanliness & Style:</span></span>
+                        <span className="font-bold text-arena-neonGreen">{myScore.cleanliness ?? 0}/20</span>
+                      </div>
+                      <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
+                        <div className="bg-arena-neonGreen h-full rounded-full transition-all duration-1000" style={{ width: `${((myScore.cleanliness ?? 0) / 20) * 100}%` }} />
                       </div>
                     </div>
                   </div>
@@ -369,7 +433,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                   </div>
 
                   <p className="text-[11px] font-mono text-gray-400 truncate mb-4">
-                    Wallet: {opponentScore.address} • Tests: <span className="text-arena-neonGreen font-bold">{opponentScore.testCasesPassed || '8/10 (80%)'}</span>
+                    Wallet: {opponentScore.address} • Tests: <span className="text-arena-neonGreen font-bold">{opponentScore.testCasesPassed || '0/10 (0%)'}</span>
                   </p>
 
                   <div className="space-y-3 font-mono text-xs">
@@ -386,20 +450,30 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                     <div>
                       <div className="flex justify-between text-gray-400 mb-1">
                         <span>Time Complexity:</span>
-                        <span>{opponentScore.timeComplexityScore ?? 20}/25</span>
+                        <span>{opponentScore.timeComplexityScore ?? 0}/25</span>
                       </div>
                       <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                        <div className="bg-gray-500 h-full rounded-full" style={{ width: `${((opponentScore.timeComplexityScore ?? 20) / 25) * 100}%` }} />
+                        <div className="bg-gray-500 h-full rounded-full" style={{ width: `${((opponentScore.timeComplexityScore ?? 0) / 25) * 100}%` }} />
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between text-gray-400 mb-1">
                         <span>Space & Memory:</span>
-                        <span>{opponentScore.spaceComplexityScore ?? 12}/15</span>
+                        <span>{opponentScore.spaceComplexityScore ?? 0}/15</span>
                       </div>
                       <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                        <div className="bg-gray-500 h-full rounded-full" style={{ width: `${((opponentScore.spaceComplexityScore ?? 12) / 15) * 100}%` }} />
+                        <div className="bg-gray-500 h-full rounded-full" style={{ width: `${((opponentScore.spaceComplexityScore ?? 0) / 15) * 100}%` }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-gray-400 mb-1">
+                        <span>Cleanliness:</span>
+                        <span>{opponentScore.cleanliness ?? 0}/20</span>
+                      </div>
+                      <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
+                        <div className="bg-gray-500 h-full rounded-full" style={{ width: `${((opponentScore.cleanliness ?? 0) / 20) * 100}%` }} />
                       </div>
                     </div>
                   </div>
@@ -410,6 +484,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                   {opponentScore.feedback}
                 </div>
               </div>
+
             </div>
 
             <div className="p-4 bg-arena-bg/60 border border-arena-border rounded-xl text-xs text-gray-300 text-left font-mono">
@@ -423,6 +498,8 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
         {activeTab === 'viewCodes' && (
           <div className="space-y-4 pt-6 text-left font-mono">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* YOUR SUBMITTED CODE */}
               <div className="bg-arena-bg border border-arena-border rounded-2xl p-4 flex flex-col justify-between">
                 <div className="flex items-center justify-between pb-2 border-b border-arena-border mb-3">
                   <div className="flex items-center space-x-2">
@@ -445,6 +522,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                 </div>
               </div>
 
+              {/* OPPONENT'S SUBMITTED CODE */}
               <div className="bg-arena-bg border border-arena-border rounded-2xl p-4 flex flex-col justify-between">
                 <div className="flex items-center justify-between pb-2 border-b border-arena-border mb-3">
                   <div className="flex items-center space-x-2">
@@ -466,6 +544,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                   <pre><code>{opponentScore.code || '// No code submitted'}</code></pre>
                 </div>
               </div>
+
             </div>
           </div>
         )}
@@ -484,6 +563,8 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* Your Deductions & Mistakes */}
               <div className="p-4 bg-arena-bg border border-arena-border rounded-xl space-y-3">
                 <h4 className="text-xs font-bold text-arena-neonCyan flex items-center space-x-1.5">
                   <ShieldAlert className="w-4 h-4" />
@@ -500,8 +581,34 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                     ))}
                   </div>
                 )}
+
+                {myScore.scoreBonuses && myScore.scoreBonuses.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    {myScore.scoreBonuses.map((b, i) => (
+                      <div key={i} className="flex items-start space-x-2 text-xs text-arena-neonGreen">
+                        <PlusCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span>{b}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-arena-border/60">
+                  <span className="text-[11px] text-gray-400 font-bold uppercase block mb-1">Code Analysis:</span>
+                  {myScore.mistakes && myScore.mistakes.length > 0 ? (
+                    myScore.mistakes.map((m, i) => (
+                      <div key={i} className="text-xs text-gray-300 flex items-start space-x-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-yellow-400 shrink-0 mt-0.5" />
+                        <span>{m}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-xs text-arena-neonGreen">Clean execution with no syntax or logic blunders detected.</span>
+                  )}
+                </div>
               </div>
 
+              {/* Opponent Deductions */}
               <div className="p-4 bg-arena-bg border border-arena-border rounded-xl space-y-3">
                 <h4 className="text-xs font-bold text-arena-neonPurple flex items-center space-x-1.5">
                   <ShieldAlert className="w-4 h-4" />
@@ -520,7 +627,22 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                 ) : (
                   <span className="text-xs text-gray-500">No deductions recorded.</span>
                 )}
+
+                <div className="pt-2 border-t border-arena-border/60">
+                  <span className="text-[11px] text-gray-400 font-bold uppercase block mb-1">Code Analysis:</span>
+                  {opponentScore.mistakes && opponentScore.mistakes.length > 0 ? (
+                    opponentScore.mistakes.map((m, i) => (
+                      <div key={i} className="text-xs text-gray-400 flex items-start space-x-1.5">
+                        <XCircle className="w-3.5 h-3.5 text-arena-neonRed shrink-0 mt-0.5" />
+                        <span>{m}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-xs text-gray-500">Clean execution.</span>
+                  )}
+                </div>
               </div>
+
             </div>
           </div>
         )}
@@ -567,7 +689,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
           </div>
         )}
 
-        {/* Modal Bottom Actions */}
+        {/* Modal Bottom Navigation */}
         <div className="mt-8 pt-4 border-t border-arena-border flex flex-col sm:flex-row gap-3">
           <Link
             href="/"
