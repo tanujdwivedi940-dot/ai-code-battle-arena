@@ -2,29 +2,40 @@ const hre = require("hardhat");
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
+  const balance = await hre.ethers.provider.getBalance(deployer.address);
+
   console.log(`🚀 Deploying with account: ${deployer.address}`);
+  console.log(`💰 Account Balance: ${hre.ethers.formatEther(balance)} POL`);
 
-  // 👇 PASTE YOUR REPUTATION NFT ADDRESS HERE:
-  const nftAddress = "0xB12a4C4472415AEF879aDa91Ff67627f69b136cB";
+  // Fetch network fee data to prevent gas spikes
+  const feeData = await hre.ethers.provider.getFeeData();
+  const gasOverrides = {
+    gasPrice: feeData.gasPrice || hre.ethers.parseUnits("35", "gwei"),
+  };
 
-  console.log(`♻️  Using existing ReputationNFT at: ${nftAddress}`);
-  const reputationNFT = await hre.ethers.getContractAt("ReputationNFT", nftAddress);
+  // 1. Deploy the NEW ReputationNFT (with public claimBadge function)
+  console.log("⏳ Deploying updated ReputationNFT (with public claimBadge)...");
+  const ReputationNFT = await hre.ethers.getContractFactory("ReputationNFT");
+  const reputationNFT = await ReputationNFT.deploy(gasOverrides);
+  await reputationNFT.waitForDeployment();
+  const nftAddress = await reputationNFT.getAddress();
+  console.log(`✅ New ReputationNFT deployed to: ${nftAddress}`);
 
-  // 2. Deploy BattleArena (Only costs ~0.03 POL, you have 0.062 POL!)
-  console.log(`⏳ Deploying BattleArena...`);
+  // 2. Deploy BattleArena
+  console.log("⏳ Deploying BattleArena...");
   const BattleArena = await hre.ethers.getContractFactory("BattleArena");
-  const battleArena = await BattleArena.deploy(deployer.address);
+  const battleArena = await BattleArena.deploy(deployer.address, gasOverrides);
   await battleArena.waitForDeployment();
   const arenaAddress = await battleArena.getAddress();
   console.log(`✅ BattleArena deployed to: ${arenaAddress}`);
 
   // 3. Link them together
-  console.log(`🔗 Linking contracts...`);
-  const tx1 = await reputationNFT.setBattleArenaContract(arenaAddress);
+  console.log("🔗 Linking contracts...");
+  const tx1 = await reputationNFT.setBattleArenaContract(arenaAddress, gasOverrides);
   await tx1.wait();
-  const tx2 = await battleArena.setReputationNFT(nftAddress);
+  const tx2 = await battleArena.setReputationNFT(nftAddress, gasOverrides);
   await tx2.wait();
-  console.log(`🎉 All contracts deployed and linked successfully!`);
+  console.log("🎉 All contracts deployed and linked successfully!");
 
   console.log("\n================ COPY TO FRONTEND ================");
   console.log(`NEXT_PUBLIC_BATTLE_ARENA_ADDRESS="${arenaAddress}"`);

@@ -111,17 +111,16 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
     }
   }, [isUserWinner, isDraw]);
 
-  // Mint Soulbound NFT
+// ⚡ MINT SOULBOUND NFT BADGE TO WINNER ON POLYGON AMOY
   const handleClaimSoulboundBadge = () => {
     if (!address) return;
     try {
       writeContract({
         address: REPUTATION_NFT_ADDRESS,
         abi: REPUTATION_NFT_ABI,
-        functionName: 'mintWinnerBadge',
+        functionName: 'claimBadge',
         args: [
-          address,
-          `ipfs://badge/${result.scores.player1.total}`,
+          `ipfs://badge/${result.scores?.player1?.total || 90}`,
           '1v1 Algorithmic Battle Arena',
           BigInt(myScore.total || 90)
         ],

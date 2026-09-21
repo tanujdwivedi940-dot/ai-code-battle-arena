@@ -11,8 +11,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  */
 contract ReputationNFT is ERC721URIStorage, Ownable {
     uint256 private _nextTokenId;
-
-    // Address of the BattleArena contract authorized to mint
     address public battleArenaContract;
 
     struct BadgeData {
@@ -27,11 +25,6 @@ contract ReputationNFT is ERC721URIStorage, Ownable {
 
     event BadgeMinted(address indexed recipient, uint256 indexed tokenId, string problemTitle, uint256 score);
 
-    modifier onlyAuthorized() {
-        require(msg.sender == owner() || msg.sender == battleArenaContract, "Not authorized to mint");
-        _;
-    }
-
     constructor() ERC721("AI Code Battle Reputation", "ACBR") Ownable(msg.sender) {}
 
     function setBattleArenaContract(address _arena) external onlyOwner {
@@ -39,14 +32,40 @@ contract ReputationNFT is ERC721URIStorage, Ownable {
     }
 
     /**
-     * @dev Mints a non-transferable Soulbound reputation badge to the match winner.
+     * @dev Public claim function allowing any winner to mint their Soulbound badge directly to their wallet.
+     */
+    function claimBadge(
+        string memory tokenUri,
+        string memory problemTitle,
+        uint256 score
+    ) external returns (uint256) {
+        uint256 tokenId = _nextTokenId++;
+        _safeMint(msg.sender, tokenId);
+        _setTokenURI(tokenId, tokenUri);
+
+        badgeDetails[tokenId] = BadgeData({
+            battleId: tokenId,
+            problemTitle: problemTitle,
+            score: score,
+            timestamp: block.timestamp
+        });
+
+        userWinCount[msg.sender] += 1;
+
+        emit BadgeMinted(msg.sender, tokenId, problemTitle, score);
+        return tokenId;
+    }
+
+    /**
+     * @dev Authorized minting function for BattleArena contract or owner.
      */
     function mintWinnerBadge(
         address recipient,
         string memory tokenUri,
         string memory problemTitle,
         uint256 score
-    ) external onlyAuthorized returns (uint256) {
+    ) external returns (uint256) {
+        require(msg.sender == owner() || msg.sender == battleArenaContract || msg.sender == recipient, "Not authorized");
         uint256 tokenId = _nextTokenId++;
         _safeMint(recipient, tokenId);
         _setTokenURI(tokenId, tokenUri);
@@ -65,8 +84,7 @@ contract ReputationNFT is ERC721URIStorage, Ownable {
     }
 
     /**
-     * @dev Overriding transfer hooks in OpenZeppelin v5 to make the NFT Soulbound (Non-transferable).
-     * Tokens can only be minted (from address 0) or burned (to address 0).
+     * @dev Soulbound Hook: Prevents transferring or selling badges on secondary markets.
      */
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = _ownerOf(tokenId);
