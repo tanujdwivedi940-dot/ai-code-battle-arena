@@ -3,7 +3,7 @@
 import { useParams, useSearchParams } from 'next/navigation';
 import { useAccount, useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useBattleSocket } from '@/hooks/useBattleSocket';
 import ProblemCard from '@/components/ProblemCard';
 import BattleEditor from '@/components/BattleEditor';
@@ -23,15 +23,15 @@ import {
   Volume2, 
   VolumeX, 
   Sparkles, 
-  Coins,
+  Coins, 
   Loader2, 
-  Lock,
-  ShieldCheck
+  Lock, 
+  ShieldCheck 
 } from 'lucide-react';
 import { sfx } from '@/utils/soundEffects';
 import { BATTLE_ARENA_ADDRESS, BATTLE_ARENA_ABI, STAKE_TIERS } from '@/config/contracts';
 
-export default function BattleRoomPage() {
+function BattleArenaContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const roomId = params.roomId as string;
@@ -43,7 +43,6 @@ export default function BattleRoomPage() {
   const [isMusicMuted, setIsMusicMuted] = useState(false);
   const [customMinsInput, setCustomMinsInput] = useState('');
 
-  // 💰 Wagmi Async Contract Write
   const { writeContractAsync, isPending: isStakingTx } = useWriteContract();
 
   const {
@@ -75,17 +74,26 @@ export default function BattleRoomPage() {
     sendReaction,
   } = useBattleSocket(roomId, address, requestedRole, problemId);
 
-  const me = players.find((p) => p.id === socketId);
-  const opponent = players.find((p) => p.id !== socketId);
-  const player1 = players.find((p) => p.slot === 'player1');
+  // Instant Player 1 & Me Resolution
+  const player1 = players.find((p) => p.slot === 'player1') || {
+    id: 'local_p1',
+    slot: 'player1' as const,
+    walletAddress: address || 'Connecting...',
+    ready: false,
+    code: '',
+    language: 'c',
+    submitted: false,
+  };
+
   const player2 = players.find((p) => p.slot === 'player2');
-  const isCreator = me?.slot === 'player1';
+  const me = players.find((p) => p.id === socketId) || player1;
+  const opponent = players.find((p) => p.id !== socketId) || player2;
+  const isCreator = me?.slot === 'player1' || !player2;
   const isUnlimited = durationSeconds === 0;
 
   const isVersusBot = Boolean(player2?.isBot || opponent?.isBot);
   const isMyCodeLocked = Boolean(isOptimisticallySubmitted || me?.submitted || battleState === 'judging' || battleState === 'completed');
 
-  // 💰 100% Type-Safe Staking Handler
   const handleStakeAndReady = async () => {
     const requiredStake = isVersusBot ? 0 : parseFloat(stakeAmount || '0.005');
 
@@ -104,7 +112,7 @@ export default function BattleRoomPage() {
         functionName: 'stake',
         args: [cleanRoomId],
         value: parseEther(cleanAmount),
-      });
+      } as any);
 
       sendReady(true);
     } catch (err) {
@@ -226,12 +234,13 @@ export default function BattleRoomPage() {
       {/* Live AI Commentary Ticker */}
       <CommentaryFeed messages={commentary} isSpectator={isSpectator} />
 
-      {/* 🌟 LOBBY VIEW 🌟 */}
+      {/* 🌟 LOBBY VIEW (Instantly Renders Player 1 & Stake Button) 🌟 */}
       {battleState === 'waiting' && (
         <div className="max-w-4xl mx-auto my-6 space-y-5">
+          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            {/* 💰 1. Staking Tier Selector */}
+            {/* 1. Stake Tier */}
             <div className="bg-arena-card border border-arena-border p-4 rounded-2xl shadow-xl flex flex-col justify-between text-left space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -271,7 +280,7 @@ export default function BattleRoomPage() {
               )}
             </div>
 
-            {/* ⏱️ 2. Match Duration */}
+            {/* 2. Match Duration */}
             <div className="bg-arena-card border border-arena-border p-4 rounded-2xl shadow-xl flex flex-col justify-between text-left space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -313,7 +322,7 @@ export default function BattleRoomPage() {
               )}
             </div>
 
-            {/* 🎙️ 3. Referee Persona */}
+            {/* 3. Referee Persona */}
             <div className="bg-arena-card border border-arena-border p-4 rounded-2xl shadow-xl flex flex-col justify-between text-left space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -349,24 +358,22 @@ export default function BattleRoomPage() {
           {/* Lobby Slots */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
-            {/* Slot 1: Player 1 */}
-            <div className={`bg-arena-card border p-6 rounded-2xl shadow-xl ${
-              me?.slot === 'player1' ? 'border-arena-neonCyan glow-cyan' : 'border-arena-border'
-            }`}>
+            {/* Slot 1: Player 1 (INSTANTLY READY TO CLICK) */}
+            <div className="bg-arena-card border border-arena-neonCyan/40 glow-cyan p-6 rounded-2xl shadow-xl">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-mono px-2.5 py-1 rounded bg-arena-neonCyan/10 text-arena-neonCyan border border-arena-neonCyan/30">
-                  PLAYER 1 {me?.slot === 'player1' ? '(YOU)' : ''}
+                <span className="text-xs font-mono px-2.5 py-1 rounded bg-arena-neonCyan/10 text-arena-neonCyan border border-arena-neonCyan/30 font-bold">
+                  PLAYER 1 (YOU)
                 </span>
-                <span className={`w-3 h-3 rounded-full ${player1 ? 'bg-arena-neonGreen' : 'bg-gray-600'}`} />
+                <span className={`w-3 h-3 rounded-full ${player1?.ready ? 'bg-arena-neonGreen' : 'bg-arena-neonCyan animate-pulse'}`} />
               </div>
               <h3 className="font-mono text-sm text-gray-300 truncate">
-                {player1 ? player1.walletAddress : 'Waiting for player...'}
+                {address || player1?.walletAddress || 'Your Arena Seat'}
               </h3>
               <p className="text-xs text-gray-500 mt-1 font-mono">
-                Status: {player1?.ready ? (!isVersusBot && parseFloat(stakeAmount) > 0 ? '💰 STAKED & READY 🔥' : '🔥 READY') : 'Not Ready'}
+                Status: {player1?.ready ? (!isVersusBot && parseFloat(stakeAmount) > 0 ? '💰 STAKED & READY 🔥' : '🔥 READY') : 'Ready to Start'}
               </p>
 
-              {me?.slot === 'player1' && !me?.ready && (
+              {!player1?.ready && (
                 <button
                   onClick={handleStakeAndReady}
                   disabled={isStakingTx}
@@ -395,42 +402,22 @@ export default function BattleRoomPage() {
 
             {/* Slot 2: Player 2 OR AI Bot */}
             <div className={`bg-arena-card border p-6 rounded-2xl shadow-xl ${
-              me?.slot === 'player2' ? 'border-arena-neonPurple glow-purple' : 'border-arena-border'
+              player2 ? 'border-arena-neonPurple glow-purple' : 'border-arena-border'
             }`}>
               <div className="flex items-center justify-between mb-4">
                 <span className="text-xs font-mono px-2.5 py-1 rounded bg-arena-neonPurple/10 text-arena-neonPurple border border-arena-neonPurple/30">
-                  {player2?.isBot ? '🤖 AI BOSS' : 'PLAYER 2'} {me?.slot === 'player2' ? '(YOU)' : ''}
+                  {player2?.isBot ? '🤖 AI BOSS' : 'PLAYER 2'}
                 </span>
-                <span className={`w-3 h-3 rounded-full ${player2 ? 'bg-arena-neonGreen' : 'bg-arena-neonRed animate-ping'}`} />
+                <span className={`w-3 h-3 rounded-full ${player2?.ready ? 'bg-arena-neonGreen' : 'bg-gray-600'}`} />
               </div>
               <h3 className="font-mono text-sm text-gray-300 truncate">
                 {player2 ? player2.walletAddress : 'Waiting for opponent...'}
               </h3>
               <p className="text-xs text-gray-500 mt-1 font-mono">
-                Status: {player2?.ready ? (player2.isBot ? '🔥 READY' : parseFloat(stakeAmount) > 0 ? '💰 STAKED & READY 🔥' : '🔥 READY') : 'Not Ready'}
+                Status: {player2?.ready ? (player2.isBot ? '🔥 READY' : parseFloat(stakeAmount) > 0 ? '💰 STAKED & READY 🔥' : '🔥 READY') : 'Not Joined'}
               </p>
 
-              {me?.slot === 'player2' && !me?.ready && !player2?.isBot && (
-                <button
-                  onClick={handleStakeAndReady}
-                  disabled={isStakingTx}
-                  className="mt-6 w-full py-3 bg-gradient-to-r from-arena-neonPurple to-pink-500 text-white font-bold rounded-xl text-sm hover:scale-[1.02] transition font-mono shadow-xl flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
-                >
-                  {isStakingTx ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Depositing Stake to Escrow...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Coins className="w-4 h-4" />
-                      <span>{parseFloat(stakeAmount) > 0 ? `Stake ${stakeAmount} POL & Ready Up` : 'Ready Up (Free)'}</span>
-                    </>
-                  )}
-                </button>
-              )}
-
-              {/* Spawn AI Bot */}
+              {/* Spawn AI Bot Buttons */}
               {!player2 && (
                 <div className="mt-4 pt-3 border-t border-arena-border space-y-2">
                   <span className="text-[11px] font-mono text-gray-400 block text-left font-bold">
@@ -557,5 +544,13 @@ export default function BattleRoomPage() {
       )}
 
     </div>
+  );
+}
+
+export default function BattleRoomPageWrapper() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center font-mono text-xs text-gray-500">Loading Battle Arena...</div>}>
+      <BattleArenaContent />
+    </Suspense>
   );
 }

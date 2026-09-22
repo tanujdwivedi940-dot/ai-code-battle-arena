@@ -81,7 +81,21 @@ export function useBattleSocket(
   const [socketId, setSocketId] = useState<string>('');
   const [isSpectator, setIsSpectator] = useState<boolean>(requestedRole === 'spectator');
   const [spectatorCount, setSpectatorCount] = useState<number>(0);
-  const [players, setPlayers] = useState<Player[]>([]);
+  
+  // ⚡ INSTANT OPTIMISTIC INITIALIZATION (Zero 10-second wait!)
+  const [players, setPlayers] = useState<Player[]>([
+    {
+      id: 'local_p1',
+      slot: 'player1',
+      walletAddress: walletAddress || 'Connecting...',
+      ready: false,
+      staked: false,
+      code: '',
+      language: 'c',
+      submitted: false,
+    }
+  ]);
+
   const [problem, setProblem] = useState<Problem | null>(null);
   const [battleState, setBattleState] = useState<'waiting' | 'in-progress' | 'judging' | 'completed'>('waiting');
   const [persona, setPersonaState] = useState<string>('esports');
@@ -100,6 +114,7 @@ export function useBattleSocket(
 
   const myCodeRef = useRef<string>('');
   const myLanguageRef = useRef<string>('c');
+  const walletAddressRef = useRef<string>(walletAddress || '');
   const socketRef = useRef<Socket | null>(null);
   const initializedRef = useRef<boolean>(false);
 
@@ -108,8 +123,30 @@ export function useBattleSocket(
   }, [myLanguage]);
 
   useEffect(() => {
+    walletAddressRef.current = walletAddress || '';
+    if (walletAddress && socketRef.current?.connected) {
+      socketRef.current.emit('join_room', {
+        roomId,
+        walletAddress,
+        language: myLanguageRef.current,
+        role: requestedRole,
+        problemId: problemId,
+        persona: persona,
+        starterCode: myCodeRef.current,
+      });
+    }
+  }, [walletAddress, roomId, requestedRole, problemId, persona]);
+
+  useEffect(() => {
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
-    const socket: Socket = io(socketUrl);
+    
+    // ⚡ Fast direct WebSocket connection without slow polling fallback delays
+    const socket: Socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 500,
+    });
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -117,7 +154,7 @@ export function useBattleSocket(
       const initialTemplate = problem ? getStarterTemplate(problem, myLanguageRef.current) : '';
       socket.emit('join_room', {
         roomId,
-        walletAddress,
+        walletAddress: walletAddressRef.current,
         language: myLanguageRef.current,
         role: requestedRole,
         problemId: problemId,
@@ -129,7 +166,9 @@ export function useBattleSocket(
     socket.on('spectator_joined', () => setIsSpectator(true));
 
     socket.on('room_state', (data) => {
-      setPlayers(data.players || []);
+      if (data.players && data.players.length > 0) {
+        setPlayers(data.players);
+      }
       setProblem(data.problem || null);
       setSpectatorCount(data.spectatorCount || 0);
       setBattleState(data.battleState || 'waiting');
@@ -138,7 +177,7 @@ export function useBattleSocket(
       if (data.stakeAmount) setStakeAmountState(data.stakeAmount);
       if (data.result) setResult(data.result);
 
-      const isPlayerSeat = (data.players || []).some((p: Player) => p.id === socket.id);
+      const isPlayerSeat = (data.players || []).some((p: Player) => p.id === socket.id || p.walletAddress === walletAddressRef.current);
       if (isPlayerSeat) setIsSpectator(false);
 
       if (data.problem && !initializedRef.current) {
@@ -193,9 +232,13 @@ export function useBattleSocket(
       sfx.stopBattleMusic();
       socket.disconnect();
     };
-  }, [roomId, walletAddress, requestedRole, problemId, persona]);
+  }, [roomId, requestedRole, problemId, persona]);
 
   const sendReady = (isStaked = false) => {
+    // Optimistically update local player state
+    setPlayers((prev) =>
+      prev.map((p) => (p.slot === 'player1' ? { ...p, ready: true, staked: isStaked } : p))
+    );
     socketRef.current?.emit('player_ready', { roomId, isStaked });
   };
 
@@ -235,7 +278,6 @@ export function useBattleSocket(
     socketRef.current?.emit('code_update', { roomId, code, language: myLanguageRef.current });
   }, [roomId]);
 
-  // ⚡ Passes current starter template alongside submitted code
   const submitCode = useCallback(() => {
     const finalCode = myCodeRef.current || myCode;
     const currentStarter = problem ? getStarterTemplate(problem, myLanguageRef.current) : '';
