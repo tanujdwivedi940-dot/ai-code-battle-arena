@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useSearchParams } from 'next/navigation';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
 import { useState } from 'react';
 import { useBattleSocket } from '@/hooks/useBattleSocket';
@@ -43,9 +43,8 @@ export default function BattleRoomPage() {
   const [isMusicMuted, setIsMusicMuted] = useState(false);
   const [customMinsInput, setCustomMinsInput] = useState('');
 
-  // 💰 Staking Contract Call
-  const { writeContract, data: stakeTxHash, isPending: isStakingTx } = useWriteContract();
-  const { isLoading: isWaitingStakeReceipt } = useWaitForTransactionReceipt({ hash: stakeTxHash });
+  // 💰 Wagmi Async Contract Write
+  const { writeContractAsync, isPending: isStakingTx } = useWriteContract();
 
   const {
     socketId,
@@ -83,15 +82,13 @@ export default function BattleRoomPage() {
   const isCreator = me?.slot === 'player1';
   const isUnlimited = durationSeconds === 0;
 
-  // 🤖 Check if battle is versus an AI Bot
   const isVersusBot = Boolean(player2?.isBot || opponent?.isBot);
   const isMyCodeLocked = Boolean(isOptimisticallySubmitted || me?.submitted || battleState === 'judging' || battleState === 'completed');
 
-  // 💰 Staking Handler (Only prompts MetaMask if playing against a real human with stake > 0)
+  // 💰 100% Type-Safe Staking Handler
   const handleStakeAndReady = async () => {
     const requiredStake = isVersusBot ? 0 : parseFloat(stakeAmount || '0.005');
 
-    // 🚀 Free for AI Bots or 0 POL tier -> Immediate Ready Up without MetaMask popup!
     if (isVersusBot || requiredStake === 0 || !isConnected) {
       sendReady(false);
       return;
@@ -101,27 +98,17 @@ export default function BattleRoomPage() {
       const cleanAmount = String(parseFloat(stakeAmount) || 0.005);
       const cleanRoomId = String(roomId).split('?')[0].trim();
 
-      writeContract(
-        {
-          address: BATTLE_ARENA_ADDRESS,
-          abi: BATTLE_ARENA_ABI,
-          functionName: 'stake',
-          args: [cleanRoomId],
-          value: parseEther(cleanAmount),
-         gas: BigInt(120000),
-        },
-        {
-          onSuccess: () => {
-            sendReady(true);
-          },
-          onError: (err) => {
-            console.warn('Staking cancelled or fallback:', err);
-            sendReady(false);
-          },
-        }
-      );
+      await writeContractAsync({
+        address: BATTLE_ARENA_ADDRESS,
+        abi: BATTLE_ARENA_ABI,
+        functionName: 'stake',
+        args: [cleanRoomId],
+        value: parseEther(cleanAmount),
+      });
+
+      sendReady(true);
     } catch (err) {
-      console.error('Staking execution error:', err);
+      console.warn('Staking cancelled or fallback:', err);
       sendReady(false);
     }
   };
@@ -242,7 +229,6 @@ export default function BattleRoomPage() {
       {/* 🌟 LOBBY VIEW 🌟 */}
       {battleState === 'waiting' && (
         <div className="max-w-4xl mx-auto my-6 space-y-5">
-          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
             {/* 💰 1. Staking Tier Selector */}
@@ -383,10 +369,10 @@ export default function BattleRoomPage() {
               {me?.slot === 'player1' && !me?.ready && (
                 <button
                   onClick={handleStakeAndReady}
-                  disabled={isStakingTx || isWaitingStakeReceipt}
+                  disabled={isStakingTx}
                   className="mt-6 w-full py-3 bg-gradient-to-r from-arena-neonCyan to-arena-neonPurple text-black font-bold rounded-xl text-sm hover:scale-[1.02] transition font-mono shadow-xl flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
                 >
-                  {isStakingTx || isWaitingStakeReceipt ? (
+                  {isStakingTx ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span>Depositing Stake to Escrow...</span>
@@ -427,10 +413,10 @@ export default function BattleRoomPage() {
               {me?.slot === 'player2' && !me?.ready && !player2?.isBot && (
                 <button
                   onClick={handleStakeAndReady}
-                  disabled={isStakingTx || isWaitingStakeReceipt}
+                  disabled={isStakingTx}
                   className="mt-6 w-full py-3 bg-gradient-to-r from-arena-neonPurple to-pink-500 text-white font-bold rounded-xl text-sm hover:scale-[1.02] transition font-mono shadow-xl flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
                 >
-                  {isStakingTx || isWaitingStakeReceipt ? (
+                  {isStakingTx ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span>Depositing Stake to Escrow...</span>
