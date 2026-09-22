@@ -108,7 +108,7 @@ export default function BattleRoomPage() {
           functionName: 'stake',
           args: [cleanRoomId],
           value: parseEther(cleanAmount),
-          gas: 120000n, // 🔒 Explicit gas limit prevents MetaMask simulation failure!
+         gas: BigInt(120000),
         },
         {
           onSuccess: () => {
