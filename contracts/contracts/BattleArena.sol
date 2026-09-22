@@ -1,33 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-
-interface IReputationNFT {
-    function mintWinnerBadge(
-        address recipient,
-        string memory tokenUri,
-        string memory problemTitle,
-        uint256 score
-    ) external returns (uint256);
-}
-
-/**
- * @title BattleArena
- * @dev Manages 1v1 micro-stakes escrow on Polygon Amoy and pays out the AI-verified winner.
- */
-contract BattleArena is Ownable, ReentrancyGuard {
-    IReputationNFT public reputationNFT;
+contract BattleArena {
+    address public owner;
     address public refereeSigner;
+    address public reputationNFT;
 
     struct Battle {
-        string roomId;
         address player1;
         address player2;
         uint256 stakeAmount;
-        bool player1Staked;
-        bool player2Staked;
         bool isSettled;
         address winner;
     }
@@ -36,121 +18,110 @@ contract BattleArena is Ownable, ReentrancyGuard {
 
     event BattleStaked(string indexed roomId, address indexed player, uint256 amount);
     event BattleSettled(string indexed roomId, address indexed winner, uint256 totalPayout);
-    event BattleRefunded(string indexed roomId, address indexed player, uint256 refundAmount);
 
-    constructor(address _refereeSigner) Ownable(msg.sender) {
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner");
+        _;
+    }
+
+    constructor(address _refereeSigner) {
+        owner = msg.sender;
         refereeSigner = _refereeSigner;
     }
 
-    function setReputationNFT(address _nftContract) external onlyOwner {
-        reputationNFT = IReputationNFT(_nftContract);
+    function setReputationNFT(address _nft) external onlyOwner {
+        reputationNFT = _nft;
     }
 
-    function setRefereeSigner(address _newSigner) external onlyOwner {
-        refereeSigner = _newSigner;
+    function setRefereeSigner(address _signer) external onlyOwner {
+        refereeSigner = _signer;
     }
 
     /**
-     * @dev Player deposits stake into room escrow (e.g. 0.005 or 0.010 POL).
+     * @dev Player deposits stake into room escrow.
      */
-    function stake(string memory roomId) external payable nonReentrant {
-        require(msg.value > 0, "Stake must be greater than 0");
+    function stake(string calldata roomId) external payable {
+        require(msg.value > 0, "Stake must be > 0");
         Battle storage b = battles[roomId];
 
-        if (b.isSettled) {
-            b.player1 = address(0);
+        if (b.isSettled || b.player1 == address(0)) {
+            b.player1 = msg.sender;
             b.player2 = address(0);
-            b.stakeAmount = 0;
-            b.player1Staked = false;
-            b.player2Staked = false;
+            b.stakeAmount = msg.value;
             b.isSettled = false;
             b.winner = address(0);
-        }
-
-        if (b.player1 == address(0)) {
-            b.roomId = roomId;
-            b.player1 = msg.sender;
-            b.stakeAmount = msg.value;
-            b.player1Staked = true;
         } else if (b.player2 == address(0)) {
             b.player2 = msg.sender;
-            b.player2Staked = true;
-            if (b.stakeAmount == 0) {
-                b.stakeAmount = msg.value;
-            }
+            b.stakeAmount = msg.value;
         } else {
             b.player1 = msg.sender;
             b.player2 = address(0);
             b.stakeAmount = msg.value;
-            b.player1Staked = true;
-            b.player2Staked = false;
+            b.isSettled = false;
+            b.winner = address(0);
         }
 
         emit BattleStaked(roomId, msg.sender, msg.value);
     }
 
     /**
-     * @dev 💰 WINNER CLAIMS PRIZE POOL DIRECTLY WITH METAMASK
+     * @dev Winner claims prize pool directly with MetaMask.
      */
-    function claimPrize(string memory roomId) external nonReentrant {
+    function claimPrize(string calldata roomId) external {
         Battle storage b = battles[roomId];
-        require(!b.isSettled, "Prize pool already claimed or settled");
-        require(b.player1Staked, "No stakes found in escrow");
+        require(!b.isSettled, "Already settled");
+        require(b.player1 != address(0), "No battle found");
 
         b.isSettled = true;
         b.winner = msg.sender;
 
-        uint256 totalPool = b.player2Staked ? b.stakeAmount * 2 : b.stakeAmount;
-        if (totalPool == 0) {
-            totalPool = address(this).balance;
+        uint256 payout = b.player2 != address(0) ? b.stakeAmount * 2 : b.stakeAmount;
+        if (payout > address(this).balance) {
+            payout = address(this).balance;
         }
 
-        (bool sent, ) = payable(msg.sender).call{value: totalPool}("");
-        require(sent, "Prize transfer failed");
+        if (payout > 0) {
+            (bool sent, ) = payable(msg.sender).call{value: payout}("");
+            require(sent, "Transfer failed");
+        }
 
-        emit BattleSettled(roomId, msg.sender, totalPool);
+        emit BattleSettled(roomId, msg.sender, payout);
     }
 
     /**
-     * @dev Server referee automated settlement
+     * @dev Referee automated settlement
      */
     function settleBattle(
-        string memory roomId,
+        string calldata roomId,
         address payable winner,
-        string memory problemTitle,
-        uint256 winnerScore,
-        string memory tokenUri
-    ) external nonReentrant {
-        require(msg.sender == refereeSigner || msg.sender == owner(), "Only referee can settle payout");
+        string calldata /* problemTitle */,
+        uint256 /* winnerScore */,
+        string calldata /* tokenUri */
+    ) external {
+        require(msg.sender == refereeSigner || msg.sender == owner, "Only referee");
         Battle storage b = battles[roomId];
-        require(!b.isSettled, "Battle already settled");
-        require(b.player1Staked, "No stakes found in escrow");
+        require(!b.isSettled, "Already settled");
 
         b.isSettled = true;
         b.winner = winner;
 
-        uint256 totalPool = b.player2Staked ? b.stakeAmount * 2 : b.stakeAmount;
-
-        if (winner != address(0) && totalPool > 0) {
-            (bool sent, ) = winner.call{value: totalPool}("");
-            require(sent, "Payout transfer failed");
+        uint256 payout = b.player2 != address(0) ? b.stakeAmount * 2 : b.stakeAmount;
+        if (payout > address(this).balance) {
+            payout = address(this).balance;
         }
 
-        if (address(reputationNFT) != address(0) && winner != address(0)) {
-            try reputationNFT.mintWinnerBadge(winner, tokenUri, problemTitle, winnerScore) {} catch {}
+        if (winner != address(0) && payout > 0) {
+            (bool sent, ) = winner.call{value: payout}("");
+            require(sent, "Payout failed");
         }
 
-        emit BattleSettled(roomId, winner, totalPool);
+        emit BattleSettled(roomId, winner, payout);
     }
 
-    /**
-     * @dev Emergency refund if opponent does not join.
-     */
-    function refund(string memory roomId) external nonReentrant {
+    function refund(string calldata roomId) external {
         Battle storage b = battles[roomId];
-        require(!b.isSettled, "Battle already settled");
-        require(msg.sender == b.player1 || msg.sender == b.player2, "Not a participant");
-        require(!b.player2Staked, "Cannot refund: match in progress");
+        require(!b.isSettled, "Already settled");
+        require(msg.sender == b.player1 || msg.sender == b.player2, "Not participant");
 
         b.isSettled = true;
         uint256 amount = b.stakeAmount;
@@ -158,11 +129,7 @@ contract BattleArena is Ownable, ReentrancyGuard {
 
         (bool sent, ) = payable(msg.sender).call{value: amount}("");
         require(sent, "Refund failed");
-
-        emit BattleRefunded(roomId, msg.sender, amount);
     }
 
-    function getBattle(string memory roomId) external view returns (Battle memory) {
-        return battles[roomId];
-    }
+    receive() external payable {}
 }

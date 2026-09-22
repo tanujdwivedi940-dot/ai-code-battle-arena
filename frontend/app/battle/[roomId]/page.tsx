@@ -43,7 +43,7 @@ export default function BattleRoomPage() {
   const [isMusicMuted, setIsMusicMuted] = useState(false);
   const [customMinsInput, setCustomMinsInput] = useState('');
 
-  // Wagmi Staking Contract Write
+  // 💰 Staking Contract Call
   const { writeContract, data: stakeTxHash, isPending: isStakingTx } = useWriteContract();
   const { isLoading: isWaitingStakeReceipt } = useWaitForTransactionReceipt({ hash: stakeTxHash });
 
@@ -83,12 +83,11 @@ export default function BattleRoomPage() {
   const isCreator = me?.slot === 'player1';
   const isUnlimited = durationSeconds === 0;
 
-  // 🤖 Check if match is versus an AI Bot
+  // 🤖 Check if battle is versus an AI Bot
   const isVersusBot = Boolean(player2?.isBot || opponent?.isBot);
-
   const isMyCodeLocked = Boolean(isOptimisticallySubmitted || me?.submitted || battleState === 'judging' || battleState === 'completed');
 
-  // 💰 Staking Handler (Only prompts MetaMask if playing against a REAL human with stake > 0)
+  // 💰 Staking Handler (Only prompts MetaMask if playing against a real human with stake > 0)
   const handleStakeAndReady = async () => {
     const requiredStake = isVersusBot ? 0 : parseFloat(stakeAmount || '0.005');
 
@@ -99,24 +98,30 @@ export default function BattleRoomPage() {
     }
 
     try {
+      const cleanAmount = String(parseFloat(stakeAmount) || 0.005);
+      const cleanRoomId = String(roomId).split('?')[0].trim();
+
       writeContract(
         {
           address: BATTLE_ARENA_ADDRESS,
           abi: BATTLE_ARENA_ABI,
           functionName: 'stake',
-          args: [roomId],
-          value: parseEther(stakeAmount),
+          args: [cleanRoomId],
+          value: parseEther(cleanAmount),
+          gas: 120000n, // 🔒 Explicit gas limit prevents MetaMask simulation failure!
         },
         {
           onSuccess: () => {
             sendReady(true);
           },
-          onError: () => {
+          onError: (err) => {
+            console.warn('Staking cancelled or fallback:', err);
             sendReady(false);
           },
         }
       );
-    } catch {
+    } catch (err) {
+      console.error('Staking execution error:', err);
       sendReady(false);
     }
   };
@@ -240,7 +245,7 @@ export default function BattleRoomPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            {/* 💰 1. Staking Tier Selector (Shows Free Badge if AI Bot is active) */}
+            {/* 💰 1. Staking Tier Selector */}
             <div className="bg-arena-card border border-arena-border p-4 rounded-2xl shadow-xl flex flex-col justify-between text-left space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
