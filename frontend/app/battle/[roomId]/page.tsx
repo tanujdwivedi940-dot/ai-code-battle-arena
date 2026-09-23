@@ -26,7 +26,9 @@ import {
   Coins, 
   Loader2, 
   Lock, 
-  ShieldCheck 
+  ShieldCheck,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { sfx } from '@/utils/soundEffects';
 import { BATTLE_ARENA_ADDRESS, BATTLE_ARENA_ABI, STAKE_TIERS } from '@/config/contracts';
@@ -47,6 +49,7 @@ function BattleArenaContent() {
 
   const {
     socketId,
+    isSocketConnected,
     isSpectator,
     spectatorCount,
     players,
@@ -74,21 +77,30 @@ function BattleArenaContent() {
     sendReaction,
   } = useBattleSocket(roomId, address, requestedRole, problemId);
 
-  // Instant Player 1 & Me Resolution
-  const player1 = players.find((p) => p.slot === 'player1') || {
+  // 🎯 Accurate Slot Resolution for Host vs Friend
+  const player1 = players.find((p) => p.slot === 'player1');
+  const player2 = players.find((p) => p.slot === 'player2');
+
+  // Identify who is "ME"
+  const me = players.find((p) => 
+    (socketId && p.id === socketId) || 
+    (address && p.walletAddress.toLowerCase() === address.toLowerCase())
+  ) || (players.length === 0 ? {
     id: 'local_p1',
     slot: 'player1' as const,
     walletAddress: address || 'Connecting...',
     ready: false,
+    staked: false,
     code: '',
     language: 'c',
     submitted: false,
-  };
+  } : undefined);
 
-  const player2 = players.find((p) => p.slot === 'player2');
-  const me = players.find((p) => p.id === socketId) || player1;
-  const opponent = players.find((p) => p.id !== socketId) || player2;
-  const isCreator = me?.slot === 'player1' || !player2;
+  const isMePlayer1 = me?.slot === 'player1';
+  const isMePlayer2 = me?.slot === 'player2';
+
+  const opponent = isMePlayer1 ? player2 : player1;
+  const isCreator = isMePlayer1;
   const isUnlimited = durationSeconds === 0;
 
   const isVersusBot = Boolean(player2?.isBot || opponent?.isBot);
@@ -234,7 +246,7 @@ function BattleArenaContent() {
       {/* Live AI Commentary Ticker */}
       <CommentaryFeed messages={commentary} isSpectator={isSpectator} />
 
-      {/* 🌟 LOBBY VIEW (Instantly Renders Player 1 & Stake Button) 🌟 */}
+      {/* 🌟 LOBBY VIEW 🌟 */}
       {battleState === 'waiting' && (
         <div className="max-w-4xl mx-auto my-6 space-y-5">
           
@@ -358,22 +370,25 @@ function BattleArenaContent() {
           {/* Lobby Slots */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
-            {/* Slot 1: Player 1 (INSTANTLY READY TO CLICK) */}
-            <div className="bg-arena-card border border-arena-neonCyan/40 glow-cyan p-6 rounded-2xl shadow-xl">
+            {/* Slot 1: Player 1 (Host) */}
+            <div className={`bg-arena-card border p-6 rounded-2xl shadow-xl ${
+              isMePlayer1 ? 'border-arena-neonCyan/60 glow-cyan' : 'border-arena-border'
+            }`}>
               <div className="flex items-center justify-between mb-4">
                 <span className="text-xs font-mono px-2.5 py-1 rounded bg-arena-neonCyan/10 text-arena-neonCyan border border-arena-neonCyan/30 font-bold">
-                  PLAYER 1 (YOU)
+                  PLAYER 1 {isMePlayer1 ? '(YOU)' : ''}
                 </span>
-                <span className={`w-3 h-3 rounded-full ${player1?.ready ? 'bg-arena-neonGreen' : 'bg-arena-neonCyan animate-pulse'}`} />
+                <span className={`w-3 h-3 rounded-full ${player1?.ready ? 'bg-arena-neonGreen' : player1 ? 'bg-arena-neonCyan animate-pulse' : 'bg-gray-600'}`} />
               </div>
-              <h3 className="font-mono text-sm text-gray-300 truncate">
-                {address || player1?.walletAddress || 'Your Arena Seat'}
+              <h3 className="font-mono text-sm text-gray-300 truncate text-left">
+                {player1?.walletAddress || 'Waiting for player...'}
               </h3>
-              <p className="text-xs text-gray-500 mt-1 font-mono">
-                Status: {player1?.ready ? (!isVersusBot && parseFloat(stakeAmount) > 0 ? '💰 STAKED & READY 🔥' : '🔥 READY') : 'Ready to Start'}
+              <p className="text-xs text-gray-500 mt-1 font-mono text-left">
+                Status: {player1?.ready ? (!isVersusBot && parseFloat(stakeAmount) > 0 ? '💰 STAKED & READY 🔥' : '🔥 READY') : player1 ? 'Ready to Start' : 'Not Joined'}
               </p>
 
-              {!player1?.ready && (
+              {/* Ready Up Button for Player 1 */}
+              {isMePlayer1 && !player1?.ready && (
                 <button
                   onClick={handleStakeAndReady}
                   disabled={isStakingTx}
@@ -400,24 +415,45 @@ function BattleArenaContent() {
               )}
             </div>
 
-            {/* Slot 2: Player 2 OR AI Bot */}
+            {/* Slot 2: Player 2 (Friend OR AI Bot) */}
             <div className={`bg-arena-card border p-6 rounded-2xl shadow-xl ${
-              player2 ? 'border-arena-neonPurple glow-purple' : 'border-arena-border'
+              isMePlayer2 ? 'border-arena-neonPurple/60 glow-purple' : 'border-arena-border'
             }`}>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-mono px-2.5 py-1 rounded bg-arena-neonPurple/10 text-arena-neonPurple border border-arena-neonPurple/30">
-                  {player2?.isBot ? '🤖 AI BOSS' : 'PLAYER 2'}
+                <span className="text-xs font-mono px-2.5 py-1 rounded bg-arena-neonPurple/10 text-arena-neonPurple border border-arena-neonPurple/30 font-bold">
+                  {player2?.isBot ? '🤖 AI BOSS' : 'PLAYER 2'} {isMePlayer2 ? '(YOU)' : ''}
                 </span>
-                <span className={`w-3 h-3 rounded-full ${player2?.ready ? 'bg-arena-neonGreen' : 'bg-gray-600'}`} />
+                <span className={`w-3 h-3 rounded-full ${player2?.ready ? 'bg-arena-neonGreen' : player2 ? 'bg-arena-neonPurple animate-pulse' : 'bg-gray-600'}`} />
               </div>
-              <h3 className="font-mono text-sm text-gray-300 truncate">
-                {player2 ? player2.walletAddress : 'Waiting for opponent...'}
+              <h3 className="font-mono text-sm text-gray-300 truncate text-left">
+                {player2?.walletAddress || 'Waiting for opponent...'}
               </h3>
-              <p className="text-xs text-gray-500 mt-1 font-mono">
-                Status: {player2?.ready ? (player2.isBot ? '🔥 READY' : parseFloat(stakeAmount) > 0 ? '💰 STAKED & READY 🔥' : '🔥 READY') : 'Not Joined'}
+              <p className="text-xs text-gray-500 mt-1 font-mono text-left">
+                Status: {player2?.ready ? (player2.isBot ? '🔥 READY' : parseFloat(stakeAmount) > 0 ? '💰 STAKED & READY 🔥' : '🔥 READY') : player2 ? 'Ready to Start' : 'Not Joined'}
               </p>
 
-              {/* Spawn AI Bot Buttons */}
+              {/* Ready Up Button for Player 2 (Friend) */}
+              {isMePlayer2 && !player2?.ready && (
+                <button
+                  onClick={handleStakeAndReady}
+                  disabled={isStakingTx}
+                  className="mt-6 w-full py-3 bg-gradient-to-r from-arena-neonPurple to-pink-500 text-white font-bold rounded-xl text-sm hover:scale-[1.02] transition font-mono shadow-xl flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
+                >
+                  {isStakingTx ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Depositing Stake to Escrow...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Coins className="w-4 h-4" />
+                      <span>{parseFloat(stakeAmount) > 0 ? `Stake ${stakeAmount} POL & Ready Up` : 'Ready Up (Free)'}</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Spawn AI Bot Buttons (Only if Player 2 is empty) */}
               {!player2 && (
                 <div className="mt-4 pt-3 border-t border-arena-border space-y-2">
                   <span className="text-[11px] font-mono text-gray-400 block text-left font-bold">

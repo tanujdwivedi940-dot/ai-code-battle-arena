@@ -79,22 +79,10 @@ export function useBattleSocket(
   problemId?: string
 ) {
   const [socketId, setSocketId] = useState<string>('');
+  const [isSocketConnected, setIsSocketConnected] = useState<boolean>(false);
   const [isSpectator, setIsSpectator] = useState<boolean>(requestedRole === 'spectator');
   const [spectatorCount, setSpectatorCount] = useState<number>(0);
-  
-  // ⚡ INSTANT OPTIMISTIC INITIALIZATION (Zero 10-second wait!)
-  const [players, setPlayers] = useState<Player[]>([
-    {
-      id: 'local_p1',
-      slot: 'player1',
-      walletAddress: walletAddress || 'Connecting...',
-      ready: false,
-      staked: false,
-      code: '',
-      language: 'c',
-      submitted: false,
-    }
-  ]);
+  const [players, setPlayers] = useState<Player[]>([]);
 
   const [problem, setProblem] = useState<Problem | null>(null);
   const [battleState, setBattleState] = useState<'waiting' | 'in-progress' | 'judging' | 'completed'>('waiting');
@@ -140,7 +128,6 @@ export function useBattleSocket(
   useEffect(() => {
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
     
-    // ⚡ Fast direct WebSocket connection without slow polling fallback delays
     const socket: Socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -151,6 +138,7 @@ export function useBattleSocket(
 
     socket.on('connect', () => {
       setSocketId(socket.id || '');
+      setIsSocketConnected(true);
       const initialTemplate = problem ? getStarterTemplate(problem, myLanguageRef.current) : '';
       socket.emit('join_room', {
         roomId,
@@ -163,12 +151,14 @@ export function useBattleSocket(
       });
     });
 
+    socket.on('disconnect', () => {
+      setIsSocketConnected(false);
+    });
+
     socket.on('spectator_joined', () => setIsSpectator(true));
 
     socket.on('room_state', (data) => {
-      if (data.players && data.players.length > 0) {
-        setPlayers(data.players);
-      }
+      setPlayers(data.players || []);
       setProblem(data.problem || null);
       setSpectatorCount(data.spectatorCount || 0);
       setBattleState(data.battleState || 'waiting');
@@ -177,7 +167,9 @@ export function useBattleSocket(
       if (data.stakeAmount) setStakeAmountState(data.stakeAmount);
       if (data.result) setResult(data.result);
 
-      const isPlayerSeat = (data.players || []).some((p: Player) => p.id === socket.id || p.walletAddress === walletAddressRef.current);
+      const isPlayerSeat = (data.players || []).some((p: Player) => 
+        p.id === socket.id || (walletAddressRef.current && p.walletAddress.toLowerCase() === walletAddressRef.current.toLowerCase())
+      );
       if (isPlayerSeat) setIsSpectator(false);
 
       if (data.problem && !initializedRef.current) {
@@ -235,10 +227,6 @@ export function useBattleSocket(
   }, [roomId, requestedRole, problemId, persona]);
 
   const sendReady = (isStaked = false) => {
-    // Optimistically update local player state
-    setPlayers((prev) =>
-      prev.map((p) => (p.slot === 'player1' ? { ...p, ready: true, staked: isStaked } : p))
-    );
     socketRef.current?.emit('player_ready', { roomId, isStaked });
   };
 
@@ -297,6 +285,7 @@ export function useBattleSocket(
 
   return {
     socketId,
+    isSocketConnected,
     isSpectator,
     spectatorCount,
     players,
