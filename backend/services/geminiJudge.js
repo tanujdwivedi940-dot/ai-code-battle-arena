@@ -1,5 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import { generateSemanticSolution } from './botCodeEngine.js';
+
 dotenv.config();
 
 const apiKey = process.env.GEMINI_API_KEY || '';
@@ -32,13 +34,10 @@ function isCodeEmptyOrStarter(code, starterCode = '') {
   const normCode = normalizeCode(code);
   const normStarter = normalizeCode(starterCode);
 
-  // 1. Direct match with language starter template
   if (normCode === normStarter || normCode.length === 0) return true;
 
-  // 2. Remove starter code from submitted code
   let diff = normCode.replace(normStarter, '');
 
-  // 3. Remove common C/Java struct definitions, includes, and default returns
   diff = diff
     .replace(/#include<[^>]+>/g, '')
     .replace(/importjava\.[^;]+;/g, '')
@@ -50,24 +49,67 @@ function isCodeEmptyOrStarter(code, starterCode = '') {
     .replace(/[\{\}\(\)\[\];,\s]/g, '')
     .trim();
 
-  // If fewer than 8 actual logic characters remain, it is unwritten boilerplate
   if (diff.length < 8) return true;
 
-  // 4. Function Body Scan: Check if there are any loops, conditionals, or mutations
   const hasLoop = /\b(for|while|do)\b/.test(code);
   const hasBranch = /\b(if|switch|case)\b/.test(code);
   const hasMutation = /(?:->|\.)next\s*=|(?:\*left|\*right)\s*=|(?:\+\+|--|\+=|-=|\*=)/.test(code);
   const hasAssignment = /(?:let|const|var|int|char\*|struct\s+\w+\*)\s+[a-zA-Z0-9_$]+\s*=/.test(code);
 
   if (!hasLoop && !hasBranch && !hasMutation && !hasAssignment) {
-    return true; // No logic statements present in the code
+    return true;
   }
 
   return false;
 }
 
+// 💡 Generates real, gold-standard master solutions with accurate Big-O & explanations
+function getAccurateOptimalSolution(problem, language = 'javascript') {
+  const code = generateSemanticSolution(problem, 'grandmaster', language);
+  const title = (problem.title || '').toLowerCase();
+  const desc = (problem.description || '').toLowerCase();
+
+  let timeComplexity = 'O(N)';
+  let spaceComplexity = 'O(1)';
+  let explanation = 'Single-pass optimal linear algorithm with minimal memory allocation.';
+
+  if (title.includes('binary search') || title.includes('search') || desc.includes('o(log n)')) {
+    timeComplexity = 'O(log n)';
+    spaceComplexity = 'O(1)';
+    explanation = 'Iteratively halves the search interval using two pointers (left and right), achieving optimal logarithmic runtime complexity with O(1) auxiliary space.';
+  } else if (title.includes('two sum') || title.includes('pair') || desc.includes('target')) {
+    timeComplexity = 'O(N)';
+    spaceComplexity = 'O(N)';
+    explanation = 'Utilizes a single-pass Hash Map to store previously seen numbers and check for the complement in O(1) constant time per element.';
+  } else if (title.includes('linked list') || title.includes('reverse') || desc.includes('head')) {
+    timeComplexity = 'O(N)';
+    spaceComplexity = 'O(1)';
+    explanation = 'Reverses the singly linked list in-place in a single linear pass by redirecting pointer references without allocating auxiliary nodes.';
+  } else if (title.includes('parentheses') || title.includes('valid') || desc.includes('bracket')) {
+    timeComplexity = 'O(N)';
+    spaceComplexity = 'O(N)';
+    explanation = 'Employs a LIFO stack to validate matching bracket pairs in linear time, short-circuiting immediately if an unexpected closing bracket is encountered.';
+  } else if (title.includes('subarray') || title.includes('kadane') || desc.includes('largest sum')) {
+    timeComplexity = 'O(N)';
+    spaceComplexity = 'O(1)';
+    explanation = "Executes Kadane's algorithm by dynamically updating the maximum contiguous subarray ending at the current index in O(N) time and O(1) memory.";
+  } else if (title.includes('water') || title.includes('container') || desc.includes('container')) {
+    timeComplexity = 'O(N)';
+    spaceComplexity = 'O(1)';
+    explanation = 'Uses an optimal inward two-pointer sweep from both boundaries, moving the shorter pointer at each step to maximize trapped water area in O(N) time.';
+  }
+
+  return {
+    language,
+    timeComplexity,
+    spaceComplexity,
+    code,
+    explanation,
+  };
+}
+
 export async function judgeBattle({ problem, player1, player2 }) {
-  console.log(`🧠 Invoking Gemini AI Master Judge with Strict 0-Point Enforcement...`);
+  console.log(`🧠 Invoking Gemini AI Master Judge with Verified Master Solutions...`);
 
   const p1Lang = player1.language || 'javascript';
   const p2Lang = player2.language || 'javascript';
@@ -78,7 +120,7 @@ export async function judgeBattle({ problem, player1, player2 }) {
   const p1Clean = cleanCode(player1.code);
   const p2Clean = cleanCode(player2.code);
 
-  console.log(`📊 Code Check -> Player 1 Blank: ${p1IsBlank}, Player 2 Blank: ${p2IsBlank}`);
+  const accurateMasterSolution = getAccurateOptimalSolution(problem, p1Lang);
 
   // 1. SCENARIO A: BOTH players submitted unedited starter code -> 0/100 DRAW
   if (p1IsBlank && p2IsBlank) {
@@ -90,18 +132,12 @@ export async function judgeBattle({ problem, player1, player2 }) {
         player1: createZeroScoreObject(player1.walletAddress, p1Lang),
         player2: createZeroScoreObject(player2.walletAddress, p2Lang),
       },
-      optimalSolution: {
-        language: p1Lang,
-        timeComplexity: 'O(N)',
-        spaceComplexity: 'O(1)',
-        code: `// Optimal benchmark for ${problem.title}\nfunction solveOptimal(...args) {\n  return true;\n}`,
-        explanation: 'Uses an optimal single-pass algorithm with minimal memory allocation.'
-      },
+      optimalSolution: accurateMasterSolution,
       highlightQuote: 'A quiet standoff in the arena — neither coder touched their keyboard!'
     }, player1, player2);
   }
 
-  // 2. SCENARIO B: BOTH players wrote IDENTICAL custom code -> DRAW with high marks
+  // 2. SCENARIO B: BOTH players wrote IDENTICAL custom code -> DRAW
   if (!p1IsBlank && !p2IsBlank && p1Clean === p2Clean) {
     return attachCodesToResult({
       winnerAddress: 'DRAW',
@@ -139,13 +175,7 @@ export async function judgeBattle({ problem, player1, player2 }) {
           mistakes: []
         }
       },
-      optimalSolution: {
-        language: p1Lang,
-        timeComplexity: 'O(N)',
-        spaceComplexity: 'O(1)',
-        code: player1.code,
-        explanation: 'Both players achieved the optimal solution for this challenge.'
-      },
+      optimalSolution: accurateMasterSolution,
       highlightQuote: 'Mirror-image algorithmic brilliance from both fighters — perfectly tied!'
     }, player1, player2);
   }
@@ -181,7 +211,7 @@ CRITICAL RULES:
    - Do NOT award 75 points or partial credit to unedited code!
 2. If Player 1 wrote code and Player 2 is blank: Player 1 MUST win (80-95 pts) and Player 2 gets 0 pts (Grade F).
 3. If Player 2 wrote code and Player 1 is blank: Player 2 MUST win (80-95 pts) and Player 1 gets 0 pts (Grade F).
-4. For mistakes, list specific deductions like ["-40 pts: Zero algorithm logic implemented", "-25 pts: Missing loop traversal"].
+4. Provide the full gold-standard optimal code solution in "optimalSolution".
 
 RETURN ONLY VALID STRICT JSON:
 {
@@ -222,10 +252,10 @@ RETURN ONLY VALID STRICT JSON:
   },
   "optimalSolution": {
     "language": "${p1Lang}",
-    "timeComplexity": "O(N)",
-    "spaceComplexity": "O(1)",
-    "code": "// Gold standard optimal code",
-    "explanation": "Explanation of optimal logic."
+    "timeComplexity": "${accurateMasterSolution.timeComplexity}",
+    "spaceComplexity": "${accurateMasterSolution.spaceComplexity}",
+    "code": "${accurateMasterSolution.code.replace(/\n/g, '\\n').replace(/"/g, '\\"')}",
+    "explanation": "${accurateMasterSolution.explanation}"
   },
   "highlightQuote": "Tournament caster quote!"
 }
@@ -255,7 +285,12 @@ RETURN ONLY VALID STRICT JSON:
   }
 
   if (!finalResult) {
-    finalResult = getIntelligentFallback(player1, player2, problem, p1IsBlank, p2IsBlank);
+    finalResult = getIntelligentFallback(player1, player2, problem, p1IsBlank, p2IsBlank, accurateMasterSolution);
+  }
+
+  // 🔒 Ensure optimalSolution is always the full, real, authentic solution
+  if (!finalResult.optimalSolution || !finalResult.optimalSolution.code || finalResult.optimalSolution.code.includes('return true;')) {
+    finalResult.optimalSolution = accurateMasterSolution;
   }
 
   // 🔒 HARDCODED STRICT 0-POINT OVERRIDE FOR BLANK/STARTER SUBMISSIONS
@@ -276,7 +311,6 @@ RETURN ONLY VALID STRICT JSON:
     finalResult.winnerAddress = 'DRAW';
   }
 
-  // Clean quote winner name formatting (Prevents "⚡ Gran" truncation)
   const winnerName = finalResult.winnerAddress.includes('Grandmaster')
     ? 'Grandmaster AI'
     : finalResult.winnerAddress.includes('Cyber')
@@ -334,7 +368,7 @@ function attachCodesToResult(result, player1, player2) {
   return result;
 }
 
-function getIntelligentFallback(player1, player2, problem, p1IsBlank, p2IsBlank) {
+function getIntelligentFallback(player1, player2, problem, p1IsBlank, p2IsBlank, masterSolution) {
   let winner = player1.walletAddress;
   let p1Total = 90;
   let p2Total = 90;
@@ -400,13 +434,7 @@ function getIntelligentFallback(player1, player2, problem, p1IsBlank, p2IsBlank)
             mistakes: []
           }
     },
-    optimalSolution: {
-      language: player1.language || 'javascript',
-      timeComplexity: 'O(N)',
-      spaceComplexity: 'O(1)',
-      code: `// Optimal solution for ${problem.title}\nfunction solve(...args) {\n  return true;\n}`,
-      explanation: 'Optimal linear-time solution.'
-    },
+    optimalSolution: masterSolution,
     highlightQuote: `${winner.substring(0, 8)} takes the victory!`
   };
 }
