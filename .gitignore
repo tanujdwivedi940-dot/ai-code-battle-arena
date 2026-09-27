@@ -1,26 +1,73 @@
 # Dependencies
 node_modules/
-*/node_modules/
 
-# Secrets & Environment Variables (Private keys & API keys)
+# Environment variables
 .env
 .env.local
-.env*.local
-*.env
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Next.js Build
-frontend/.next/
+# Build output
+dist/
+build/
 .next/
 out/
 
-# Hardhat Build Cache
-contracts/artifacts/
-contracts/cache/
-artifacts/
-cache/
-
-# Logs & OS files
+# Logs
+logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Cache
+.cache/
+.parcel-cache/
+.vite/
+.eslintcache
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Optional: VS Code settings
+# Uncomment if you want to keep shared workspace settings
+# !.vscode/settings.json
+
+# TypeScript
+*.tsbuildinfo
+
+# React Native / Expo (if applicable)
+.expo/
+.expo-shared/
+
+# Testing
+playwright-report/
+test-results/
+
+# Misc
+*.pid
+*.seed
+*.pid.lock
+node_modules/
+dist/
+.env
+.env.local
