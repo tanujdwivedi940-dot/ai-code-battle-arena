@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
-import { Volume2, VolumeX, Radio, Eye, ShieldAlert } from 'lucide-react';
+import { Volume2, VolumeX, Radio, ShieldAlert } from 'lucide-react';
 import { CommentaryMessage } from '@/hooks/useBattleSocket';
 
 interface CommentaryFeedProps {
@@ -23,7 +23,7 @@ export default function CommentaryFeed({ messages, isSpectator = false }: Commen
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(latestMessage.text);
-    utterance.rate = latestMessage.isTactical ? 1.05 : 1.15; // Deeper tone for spectator analysis
+    utterance.rate = latestMessage.isTactical ? 1.05 : 1.15;
     utterance.pitch = latestMessage.isTactical ? 0.95 : 1.05;
 
     const voices = window.speechSynthesis.getVoices();
@@ -41,32 +41,32 @@ export default function CommentaryFeed({ messages, isSpectator = false }: Commen
   };
 
   return (
-    <div className={`border rounded-2xl p-3.5 mb-4 shadow-lg overflow-hidden relative transition-all ${
+    <div className={`rounded-xl p-2.5 sm:p-3 mb-3 shadow-sm transition-all border ${
       latestMessage?.isTactical
-        ? 'bg-amber-950/40 border-amber-500/60 glow-red'
-        : 'bg-arena-card border-arena-border glow-purple'
+        ? 'bg-cp-card border-cp-accent/40'
+        : 'bg-cp-card border-cp-border'
     }`}>
       <div className="flex items-center justify-between gap-3">
         
-        <div className="flex items-center space-x-3 flex-1 overflow-hidden">
+        <div className="flex items-center space-x-2 flex-1 overflow-hidden">
           {latestMessage?.isTactical ? (
-            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/40 text-xs font-mono shrink-0 animate-pulse">
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span className="font-bold">BOOTH TACTICAL ANALYSIS</span>
+            <div className="flex items-center space-x-1 px-2 py-0.5 rounded bg-cp-accent/10 text-cp-accent border border-cp-accent/30 text-[10px] font-mono shrink-0">
+              <ShieldAlert className="w-3 h-3" />
+              <span className="font-bold">BOOTH ANALYSIS</span>
             </div>
           ) : (
-            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-arena-neonPurple/20 text-arena-neonPurple border border-arena-neonPurple/30 text-xs font-mono shrink-0">
-              <Radio className="w-3.5 h-3.5 animate-pulse text-arena-neonRed" />
-              <span className="font-bold">LIVE STADIUM CASTER</span>
+            <div className="flex items-center space-x-1 px-2 py-0.5 rounded bg-cp-bg text-cp-blue border border-cp-border text-[10px] font-mono shrink-0">
+              <Radio className="w-3 h-3 text-cp-success" />
+              <span className="font-bold uppercase tracking-wider">LIVE STADIUM CASTER</span>
             </div>
           )}
 
-          <div className="flex-1 overflow-hidden">
-            <p className={`text-xs font-mono truncate ${latestMessage?.isTactical ? 'text-amber-200 font-semibold' : 'text-gray-100'}`}>
+          <div className="flex-1 overflow-hidden text-left">
+            <p className={`text-xs font-mono truncate ${latestMessage?.isTactical ? 'text-cp-accent' : 'text-cp-text'}`}>
               {latestMessage ? (
-                <span className="italic">"{latestMessage.text}"</span>
+                <span>"{latestMessage.text}"</span>
               ) : (
-                <span className="text-gray-500 italic">Waiting for tournament action to kick off...</span>
+                <span className="text-cp-muted italic">Waiting for tournament action to kick off...</span>
               )}
             </p>
           </div>
@@ -74,14 +74,10 @@ export default function CommentaryFeed({ messages, isSpectator = false }: Commen
 
         <button
           onClick={toggleVoice}
-          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition shrink-0 ${
-            voiceEnabled
-              ? 'bg-arena-neonCyan/10 border-arena-neonCyan/40 text-arena-neonCyan'
-              : 'bg-gray-800 border-gray-700 text-gray-400'
-          }`}
+          className="flex items-center space-x-1 px-2.5 py-1 rounded bg-cp-bg border border-cp-border text-[11px] font-mono text-cp-muted hover:text-cp-heading transition shrink-0"
         >
-          {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-          <span>{voiceEnabled ? 'VOICE ON' : 'MUTED'}</span>
+          {voiceEnabled ? <Volume2 className="w-3.5 h-3.5 text-cp-success" /> : <VolumeX className="w-3.5 h-3.5 text-cp-muted" />}
+          <span className="font-semibold uppercase text-[10px]">{voiceEnabled ? 'VOICE ON' : 'MUTED'}</span>
         </button>
 
       </div>

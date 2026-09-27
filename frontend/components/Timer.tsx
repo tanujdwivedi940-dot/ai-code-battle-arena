@@ -34,12 +34,11 @@ export default function Timer({ initialSeconds = 300, onTimeUp, isLocked }: Time
     return () => clearInterval(interval);
   }, [timeLeft, isLocked, isUnlimited, onTimeUp]);
 
-  // ♾️ UNLIMITED NO-TIMER MODE
   if (isUnlimited) {
     return (
-      <div className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl border border-arena-neonCyan/40 bg-arena-neonCyan/10 text-arena-neonCyan font-mono font-bold text-xs shadow-md glow-cyan">
-        <InfinityIcon className="w-4 h-4 text-arena-neonCyan animate-pulse" />
-        <span>NO TIMER (UNLIMITED)</span>
+      <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border border-cp-border bg-cp-card text-cp-blue font-mono font-semibold text-xs shadow-sm">
+        <InfinityIcon className="w-3.5 h-3.5" />
+        <span>Unlimited</span>
       </div>
     );
   }
@@ -50,13 +49,13 @@ export default function Timer({ initialSeconds = 300, onTimeUp, isLocked }: Time
 
   return (
     <div
-      className={`flex items-center space-x-2 px-4 py-2 rounded-xl border font-mono font-bold text-sm transition-all ${
+      className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border font-mono font-semibold text-xs transition-all ${
         isUrgent
-          ? 'bg-arena-neonRed/20 border-arena-neonRed text-arena-neonRed animate-pulse glow-red'
-          : 'bg-arena-card border-arena-border text-gray-200'
+          ? 'bg-cp-error/10 border-cp-error/40 text-cp-error'
+          : 'bg-cp-card border-cp-border text-cp-heading'
       }`}
     >
-      {isUrgent ? <AlertTriangle className="w-4 h-4 text-arena-neonRed animate-bounce" /> : <Clock className="w-4 h-4 text-arena-neonCyan" />}
+      {isUrgent ? <AlertTriangle className="w-3.5 h-3.5 text-cp-error" /> : <Clock className="w-3.5 h-3.5 text-cp-blue" />}
       <span>
         {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
       </span>

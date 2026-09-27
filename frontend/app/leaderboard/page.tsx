@@ -6,15 +6,9 @@ import { useAccount, useReadContract } from 'wagmi';
 import { 
   Trophy, 
   Award, 
-  Flame, 
   Search, 
   ExternalLink, 
-  ShieldCheck, 
-  User, 
-  Coins, 
-  Sparkles,
-  Swords,
-  Filter
+  Swords
 } from 'lucide-react';
 import { REPUTATION_NFT_ADDRESS, REPUTATION_NFT_ABI } from '@/config/contracts';
 
@@ -29,7 +23,6 @@ interface LeaderboardUser {
   isMe?: boolean;
 }
 
-// 🏆 Pre-populated Season 1 Champions (Ensures the platform looks active & competitive)
 const SEED_LEADERBOARD: LeaderboardUser[] = [
   {
     rank: 1,
@@ -83,7 +76,6 @@ export default function LeaderboardPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTier, setSelectedTier] = useState<string>('All');
 
-  // 🔗 REAL ON-CHAIN READ: Query connected user's actual on-chain wins from Polygon Amoy!
   const { data: userOnChainWins } = useReadContract({
     address: REPUTATION_NFT_ADDRESS,
     abi: REPUTATION_NFT_ABI,
@@ -93,7 +85,6 @@ export default function LeaderboardPage() {
 
   const realWins = Number(userOnChainWins || 0);
 
-  // Dynamic user data
   const myData: LeaderboardUser | null = isConnected && address ? {
     rank: realWins >= 40 ? 2 : realWins >= 25 ? 4 : realWins >= 10 ? 5 : 6,
     address: address,
@@ -105,19 +96,14 @@ export default function LeaderboardPage() {
     isMe: true,
   } : null;
 
-  // Build combined hybrid leaderboard
   let combinedList = [...SEED_LEADERBOARD];
 
-  // If user is connected and not already in seed list, inject their real profile!
   if (myData && !combinedList.some(u => u.address.toLowerCase() === myData.address.toLowerCase())) {
     combinedList.push(myData);
-    // Sort by wins descending
     combinedList.sort((a, b) => b.wins - a.wins);
-    // Reassign ranks
     combinedList = combinedList.map((u, i) => ({ ...u, rank: i + 1 }));
   }
 
-  // Filter by search & tier
   const filteredUsers = combinedList.filter((user) => {
     const matchesSearch = user.address.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTier = selectedTier === 'All' || user.badgeLevel === selectedTier;
@@ -125,62 +111,59 @@ export default function LeaderboardPage() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-12 text-left">
+    <div className="max-w-6xl mx-auto px-4 py-10 text-left bg-[#0F1115] text-[#CBD5E1]">
       
       {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 pb-8 border-b border-arena-border">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-[#2A2F38]">
         <div>
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full border border-arena-neonCyan/40 bg-arena-neonCyan/10 text-arena-neonCyan text-xs font-mono mb-3">
-            <Trophy className="w-4 h-4 text-yellow-400 animate-bounce" />
-            <span>SEASON 1 • GLOBAL ON-CHAIN RANKINGS</span>
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full border border-[#2A2F38] bg-[#171A21] text-[#94A3B8] text-xs font-mono mb-2 transition-colors duration-150 hover:border-[#3B82F6]/40">
+            <Trophy className="w-3.5 h-3.5 text-[#F59E0B]" />
+            <span>Season 1 • Global Rankings</span>
           </div>
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-gray-100 tracking-tight">
-            Hall of Code Champions
+          <h1 className="text-3xl font-bold text-[#F1F5F9] tracking-tight">
+            Leaderboard
           </h1>
-          <p className="mt-2 text-sm sm:text-base text-gray-400 max-w-xl leading-relaxed">
-            Developers ranked by AI-evaluated problem solving, Big-O efficiency, and verified on-chain Soulbound reputation on Polygon Amoy.
+          <p className="mt-1 text-xs text-[#94A3B8]">
+            Developers ranked by verified on-chain wins and Big-O efficiency on Polygon Amoy.
           </p>
         </div>
 
-        {/* Quick Stats Pill */}
-        <div className="flex items-center space-x-4 bg-arena-card border border-arena-border p-4 rounded-2xl shadow-xl font-mono text-xs">
+        <div className="flex items-center space-x-3 bg-[#171A21] border border-[#2A2F38] p-3 rounded-xl font-mono text-xs shadow-sm">
           <div>
-            <span className="text-gray-500 block text-[10px]">TOTAL POOL DISTRIBUTED</span>
-            <span className="text-base font-bold text-yellow-400">1.550+ POL</span>
+            <span className="text-[#94A3B8] block text-[10px]">TOTAL PRIZE POOL</span>
+            <span className="text-sm font-bold text-[#F59E0B]">1.550+ POL</span>
           </div>
-          <div className="w-px h-8 bg-arena-border" />
+          <div className="w-px h-6 bg-[#2A2F38]" />
           <div>
-            <span className="text-gray-500 block text-[10px]">VERIFIED MATCHES</span>
-            <span className="text-base font-bold text-arena-neonGreen">150+ Won</span>
+            <span className="text-[#94A3B8] block text-[10px]">VERIFIED MATCHES</span>
+            <span className="text-sm font-bold text-[#22C55E]">150+ Won</span>
           </div>
         </div>
       </div>
 
-      {/* Search & Tier Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+      {/* Search & Tier Filters */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-5">
         
-        {/* Search Input */}
-        <div className="w-full sm:max-w-md relative font-mono">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <div className="w-full sm:max-w-xs relative font-mono">
+          <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by 0x wallet address..."
+            placeholder="Search wallet address..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-arena-card border border-arena-border rounded-xl text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-arena-neonCyan transition"
+            className="w-full pl-8 pr-3 py-1.5 bg-[#171A21] border border-[#2A2F38] rounded-lg text-xs text-[#F1F5F9] placeholder-[#94A3B8]/60 focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6]/20 transition-all duration-150"
           />
         </div>
 
-        {/* Tier Filter Buttons */}
-        <div className="flex flex-wrap gap-1.5 font-mono text-xs w-full sm:w-auto">
+        <div className="flex flex-wrap gap-1 font-mono text-xs w-full sm:w-auto">
           {['All', 'Grandmaster', 'Master', 'Diamond', 'Gold'].map((tier) => (
             <button
               key={tier}
               onClick={() => setSelectedTier(tier)}
-              className={`px-3 py-1.5 rounded-xl border transition ${
+              className={`px-3 py-1 rounded-lg border transition-all duration-150 ease-out active:scale-95 ${
                 selectedTier === tier
-                  ? 'bg-arena-neonCyan/20 text-arena-neonCyan border-arena-neonCyan font-bold'
-                  : 'bg-arena-card border-arena-border text-gray-400 hover:text-white'
+                  ? 'bg-[#0F1115] text-[#3B82F6] border-[#3B82F6] font-semibold shadow-sm'
+                  : 'bg-[#171A21] border-[#2A2F38] text-[#94A3B8] hover:text-[#F1F5F9] hover:border-[#2A2F38]/80'
               }`}
             >
               {tier}
@@ -190,102 +173,83 @@ export default function LeaderboardPage() {
 
       </div>
 
-      {/* Leaderboard Table Card */}
-      <div className="bg-arena-card border border-arena-border rounded-2xl overflow-hidden shadow-2xl">
+      {/* Leaderboard Table with smooth row hover */}
+      <div className="bg-[#171A21] border border-[#2A2F38] rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse font-mono text-xs">
             <thead>
-              <tr className="border-b border-arena-border bg-arena-bg/60 text-gray-400 uppercase tracking-wider">
-                <th className="py-4 px-6 text-center w-16">Rank</th>
-                <th className="py-4 px-6">Gladiator</th>
-                <th className="py-4 px-6">Soulbound Rank</th>
-                <th className="py-4 px-6 text-center">W / L Record</th>
-                <th className="py-4 px-6 text-center">Win Rate</th>
-                <th className="py-4 px-6 text-right">POL Won</th>
+              <tr className="border-b border-[#2A2F38] bg-[#0B0D10] text-[#94A3B8] uppercase tracking-wider">
+                <th className="py-3 px-4 text-center w-12">#</th>
+                <th className="py-3 px-4">Gladiator</th>
+                <th className="py-3 px-4">Rank</th>
+                <th className="py-3 px-4 text-center">Record</th>
+                <th className="py-3 px-4 text-center">Win Rate</th>
+                <th className="py-3 px-4 text-right">POL Won</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-arena-border">
+            <tbody className="divide-y divide-[#2A2F38]">
               {filteredUsers.map((user) => {
                 const isUserRow = user.isMe || (address && user.address.toLowerCase() === address.toLowerCase());
 
                 return (
                   <tr
                     key={user.address}
-                    className={`transition group ${
+                    className={`transition-colors duration-150 ease-out ${
                       isUserRow
-                        ? 'bg-arena-neonCyan/10 border-l-4 border-l-arena-neonCyan font-bold'
-                        : 'hover:bg-arena-bg/40'
+                        ? 'bg-[#3B82F6]/10 border-l-2 border-l-[#3B82F6]'
+                        : 'hover:bg-[#0F1115]/60'
                     }`}
                   >
-                    {/* Rank Badge */}
-                    <td className="py-4 px-6 text-center">
-                      <span
-                        className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-extrabold ${
-                          user.rank === 1
-                            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 shadow-md'
-                            : user.rank === 2
-                            ? 'bg-gray-400/20 text-gray-300 border border-gray-400/40'
-                            : user.rank === 3
-                            ? 'bg-amber-700/20 text-amber-500 border border-amber-700/40'
-                            : 'text-gray-500'
-                        }`}
-                      >
+                    <td className="py-3 px-4 text-center">
+                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs font-bold transition-transform duration-150 hover:scale-105 ${
+                        user.rank === 1
+                          ? 'bg-[#F59E0B]/10 text-[#F59E0B] border border-[#F59E0B]/30'
+                          : user.rank === 2
+                          ? 'bg-[#94A3B8]/10 text-[#CBD5E1] border border-[#2A2F38]'
+                          : user.rank === 3
+                          ? 'bg-[#F59E0B]/10 text-[#F59E0B]'
+                          : 'text-[#94A3B8]'
+                      }`}>
                         {user.rank}
                       </span>
                     </td>
 
-                    {/* Address & Profile Link */}
-                    <td className="py-4 px-6">
+                    <td className="py-3 px-4">
                       <div className="flex items-center space-x-2">
                         <Link
                           href={`/profile/${user.address}`}
-                          className={`font-mono text-xs flex items-center space-x-1.5 transition ${
-                            isUserRow ? 'text-arena-neonCyan font-bold underline' : 'text-gray-200 group-hover:text-arena-neonCyan'
+                          className={`font-mono text-xs flex items-center space-x-1 transition-colors duration-150 ${
+                            isUserRow ? 'text-[#3B82F6] font-bold underline' : 'text-[#F1F5F9] hover:text-[#3B82F6]'
                           }`}
                         >
                           <span>{user.address.substring(0, 8)}...{user.address.substring(user.address.length - 6)}</span>
-                          <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition" />
+                          <ExternalLink className="w-3 h-3 text-[#94A3B8]" />
                         </Link>
                         {isUserRow && (
-                          <span className="px-2 py-0.5 rounded-full bg-arena-neonCyan/20 text-arena-neonCyan border border-arena-neonCyan/40 text-[10px] font-bold">
+                          <span className="px-1.5 py-0.2 rounded bg-[#3B82F6]/10 text-[#3B82F6] border border-[#3B82F6]/30 text-[9px] font-bold">
                             YOU
                           </span>
                         )}
                       </div>
                     </td>
 
-                    {/* Soulbound Tier Badge */}
-                    <td className="py-4 px-6">
-                      <span
-                        className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold ${
-                          user.badgeLevel === 'Grandmaster'
-                            ? 'bg-purple-500/20 text-arena-neonPurple border border-purple-500/40'
-                            : user.badgeLevel === 'Master'
-                            ? 'bg-cyan-500/20 text-arena-neonCyan border border-cyan-500/40'
-                            : user.badgeLevel === 'Diamond'
-                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
-                            : 'bg-emerald-500/20 text-arena-neonGreen border border-emerald-500/40'
-                        }`}
-                      >
-                        <Award className="w-3.5 h-3.5" />
-                        <span>{user.badgeLevel}</span>
+                    <td className="py-3 px-4">
+                      <span className="text-xs text-[#CBD5E1]">
+                        {user.badgeLevel}
                       </span>
                     </td>
 
-                    {/* W / L */}
-                    <td className="py-4 px-6 text-center text-gray-300">
-                      <span className="text-arena-neonGreen font-bold">{user.wins}W</span>
-                      <span className="text-gray-500 mx-1">/</span>
-                      <span className="text-arena-neonRed">{user.losses}L</span>
+                    <td className="py-3 px-4 text-center text-[#CBD5E1]">
+                      <span className="text-[#22C55E] font-bold">{user.wins}W</span>
+                      <span className="text-[#94A3B8] mx-1">/</span>
+                      <span className="text-[#EF4444]">{user.losses}L</span>
                     </td>
 
-                    {/* Win Rate */}
-                    <td className="py-4 px-6 text-center text-gray-200 font-bold">
+                    <td className="py-3 px-4 text-center text-[#F1F5F9] font-semibold">
                       {user.winRate}
                     </td>
 
-                    {/* Total POL Won */}
-                    <td className="py-4 px-6 text-right font-extrabold text-yellow-400">
+                    <td className="py-3 px-4 text-right font-bold text-[#F59E0B]">
                       +{user.totalMaticWon} POL
                     </td>
                   </tr>
@@ -300,7 +264,7 @@ export default function LeaderboardPage() {
       <div className="mt-8 text-center">
         <Link
           href="/"
-          className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-arena-neonCyan to-arena-neonPurple text-black font-mono font-bold text-xs rounded-xl hover:scale-105 transition shadow-xl glow-cyan"
+          className="inline-flex items-center space-x-2 px-5 py-2.5 bg-[#3B82F6] hover:bg-[#60A5FA] text-white font-mono font-medium text-xs rounded-lg transition-all duration-150 ease-out hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.98] shadow-sm"
         >
           <Swords className="w-4 h-4" />
           <span>Challenge Top Gladiators in Arena</span>

@@ -12,7 +12,6 @@ import {
   Swords, 
   ChevronRight, 
   ArrowLeft,
-  Sparkles,
   Bot,
   Database,
   Terminal,
@@ -37,7 +36,7 @@ const ALL_15_DOMAINS = [
   { id: 'C++', name: 'C++', icon: Code2, count: 20, desc: 'STL Containers, Custom Functors, RAII, Templates & OOP' },
   { id: 'Java', name: 'Java', icon: Code2, count: 20, desc: 'Collections Framework, OOP Design Patterns, Streams & Multithreading' },
   { id: 'Python', name: 'Python', icon: Code2, count: 20, desc: 'List Comprehensions, Generators, Decorators, Itertools & Slicing' },
-  { id: 'Ruby', name: 'Ruby', icon: Sparkles, count: 20, desc: 'Blocks, Enumerable Methods, Hashes, Procs & Metaprogramming' },
+  { id: 'Ruby', name: 'Ruby', icon: Zap, count: 20, desc: 'Blocks, Enumerable Methods, Hashes, Procs & Metaprogramming' },
   { id: 'SQL', name: 'SQL', icon: Database, count: 20, desc: 'Aggregations, Window Functions, Self Joins & Subqueries' },
   { id: 'Databases', name: 'Databases', icon: Database, count: 20, desc: 'ACID Transactions, Indexes, Normalization & Schema Consistency' },
   { id: 'Linux Shell', name: 'Linux Shell', icon: Terminal, count: 20, desc: 'Bash Scripting, Pipes, grep, awk, sed & Text Processing' },
@@ -54,7 +53,6 @@ export default function SkillsPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('All');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 🔄 Fetch all 300 problems from public/data/problems.json
   useEffect(() => {
     async function loadProblems() {
       try {
@@ -70,13 +68,11 @@ export default function SkillsPage() {
     loadProblems();
   }, []);
 
-  // Launch Battle on Specific Problem
   const handleStartBattle = (problemId: string) => {
     const randomRoomId = 'battle-' + Math.random().toString(36).substring(2, 8);
     router.push(`/battle/${randomRoomId}?problem=${problemId}`);
   };
 
-  // Filter Problems for Selected Domain
   const activeProblems = problems.filter((p) => {
     const matchesTopic = !selectedTopic || p.category === selectedTopic;
     const matchesSubdomain = selectedSubdomain === 'All' || p.subtopic === selectedSubdomain;
@@ -97,22 +93,21 @@ export default function SkillsPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 text-left">
+    <div className="max-w-7xl mx-auto px-4 py-8 text-left bg-[#0F1115] text-[#CBD5E1]">
       
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-arena-border">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#2A2F38]">
         <div>
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-arena-neonCyan/10 border border-arena-neonCyan/30 text-arena-neonCyan text-xs font-mono mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>15 PRACTICE DOMAINS • 300+ CHALLENGES</span>
+          <div className="inline-flex items-center space-x-2 px-2.5 py-0.5 rounded-full bg-[#171A21] border border-[#2A2F38] text-[#94A3B8] text-[11px] font-mono mb-2 transition-colors duration-150 hover:border-[#3B82F6]/40">
+            <span>15 Practice Domains • 300+ Problems</span>
           </div>
-          <h1 className="text-3xl font-extrabold text-gray-100">
-            {selectedTopic ? selectedTopic : 'Practice Skills & Battle Domains'}
+          <h1 className="text-2xl font-bold text-[#F1F5F9]">
+            {selectedTopic ? selectedTopic : 'Practice Skills & Domains'}
           </h1>
-          <p className="text-sm text-gray-400 mt-1 font-mono">
+          <p className="text-xs text-[#94A3B8] mt-0.5 font-mono">
             {selectedTopic 
-              ? `Select any challenge in ${selectedTopic} to launch an instant 1v1 battle arena!`
-              : 'Choose a programming language, data structure, or algorithmic field to compete in.'
+              ? `Select any challenge in ${selectedTopic} to launch a 1v1 battle.`
+              : 'Choose a programming language, data structure, or algorithmic field.'
             }
           </p>
         </div>
@@ -120,17 +115,17 @@ export default function SkillsPage() {
         {selectedTopic && (
           <button
             onClick={() => { setSelectedTopic(null); setSelectedSubdomain('All'); }}
-            className="flex items-center space-x-2 px-4 py-2 bg-arena-card border border-arena-border hover:border-arena-neonCyan rounded-xl text-xs font-mono text-gray-300 transition"
+            className="bg-[#171A21] hover:bg-[#1E232B] border border-[#2A2F38] hover:border-[#3B82F6] text-[#CBD5E1] px-3 py-1.5 rounded-lg text-xs font-mono transition-all duration-150 ease-out active:scale-95 flex items-center space-x-1.5"
           >
-            <ArrowLeft className="w-4 h-4 text-arena-neonCyan" />
-            <span>All 15 Domains</span>
+            <ArrowLeft className="w-3.5 h-3.5 text-[#3B82F6]" />
+            <span>All Domains</span>
           </button>
         )}
       </div>
 
-      {/* 1. ALL 15 DOMAINS GRID (Matching HackerRank Layout) */}
+      {/* 1. ALL 15 DOMAINS GRID (1-2px lift on hover) */}
       {!selectedTopic ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {ALL_15_DOMAINS.map((topic) => {
             const Icon = topic.icon;
             const count = problems.filter((p) => p.category === topic.id).length || topic.count;
@@ -144,27 +139,29 @@ export default function SkillsPage() {
                   setSelectedDifficulty('All');
                   setSearchTerm('');
                 }}
-                className="bg-arena-card border border-arena-border hover:border-arena-neonCyan/70 rounded-2xl p-6 transition duration-200 cursor-pointer group shadow-xl hover:scale-[1.02] relative overflow-hidden"
+                className="bg-[#171A21] border border-[#2A2F38] hover:border-[#3B82F6] p-4 rounded-xl cursor-pointer flex flex-col justify-between transition-all duration-200 ease-out hover:-translate-y-[2px] active:translate-y-0 group shadow-sm"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 rounded-xl bg-arena-neonCyan/10 text-arena-neonCyan border border-arena-neonCyan/30 group-hover:scale-110 transition">
-                    <Icon className="w-6 h-6" />
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="p-1.5 rounded-md bg-[#0F1115] border border-[#2A2F38] text-[#3B82F6] transition-transform duration-200 group-hover:scale-105">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#0F1115] text-[#94A3B8] border border-[#2A2F38]">
+                      {count} Problems
+                    </span>
                   </div>
-                  <span className="text-xs font-mono px-2.5 py-1 rounded bg-gray-800 text-gray-300 border border-gray-700 font-bold">
-                    {count} Challenges
-                  </span>
+
+                  <h3 className="text-sm font-semibold text-[#F1F5F9] group-hover:text-[#3B82F6] transition-colors duration-150">
+                    {topic.name}
+                  </h3>
+                  <p className="text-xs text-[#94A3B8] mt-1 line-clamp-2 leading-relaxed">
+                    {topic.desc}
+                  </p>
                 </div>
 
-                <h3 className="text-lg font-bold text-gray-100 group-hover:text-arena-neonCyan transition">
-                  {topic.name}
-                </h3>
-                <p className="text-xs text-gray-400 mt-2 line-clamp-2 leading-relaxed">
-                  {topic.desc}
-                </p>
-
-                <div className="mt-6 pt-4 border-t border-arena-border flex items-center justify-between text-xs font-mono text-arena-neonCyan">
+                <div className="mt-3 pt-2 border-t border-[#2A2F38] flex items-center justify-between text-[11px] font-mono text-[#94A3B8] group-hover:text-[#3B82F6] transition-colors duration-150">
                   <span>Explore 20 Problems</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-3.5 h-3.5 transition-transform duration-200 ease-out group-hover:translate-x-1" />
                 </div>
               </div>
             );
@@ -172,34 +169,34 @@ export default function SkillsPage() {
         </div>
       ) : (
 
-        /* 2. PROBLEMS LIST & SIDEBAR FILTERS */
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        /* 2. PROBLEMS LIST & FILTERS */
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           
           {/* Left Sidebar Filter */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             
             {/* Search */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <div className="relative font-mono">
+              <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search challenges..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-arena-card border border-arena-border rounded-xl text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-arena-neonCyan transition font-mono"
+                className="w-full pl-8 pr-3 py-2 bg-[#171A21] border border-[#2A2F38] rounded-lg text-xs text-[#F1F5F9] placeholder-[#94A3B8]/60 focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6]/20 transition-all duration-150"
               />
             </div>
 
             {/* Subdomain Filter */}
-            <div className="bg-arena-card border border-arena-border rounded-2xl p-4">
-              <h4 className="text-xs font-mono font-bold uppercase text-gray-400 mb-3 tracking-wider">Subdomains</h4>
-              <div className="space-y-1.5">
+            <div className="bg-[#171A21] border border-[#2A2F38] rounded-xl p-3.5 shadow-sm">
+              <h4 className="text-[11px] font-mono font-bold uppercase text-[#94A3B8] mb-2.5">Subdomains</h4>
+              <div className="space-y-1">
                 <button
                   onClick={() => setSelectedSubdomain('All')}
-                  className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-mono transition ${
+                  className={`w-full text-left px-2.5 py-1 rounded text-xs font-mono transition-all duration-150 ease-out active:scale-95 ${
                     selectedSubdomain === 'All'
-                      ? 'bg-arena-neonCyan/20 text-arena-neonCyan font-bold'
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-arena-bg'
+                      ? 'bg-[#0F1115] text-[#3B82F6] border border-[#2A2F38] font-semibold'
+                      : 'text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#0F1115]/50'
                   }`}
                 >
                   All Subdomains
@@ -208,10 +205,10 @@ export default function SkillsPage() {
                   <button
                     key={sub}
                     onClick={() => setSelectedSubdomain(sub)}
-                    className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-mono transition truncate ${
+                    className={`w-full text-left px-2.5 py-1 rounded text-xs font-mono transition-all duration-150 ease-out active:scale-95 truncate ${
                       selectedSubdomain === sub
-                        ? 'bg-arena-neonCyan/20 text-arena-neonCyan font-bold'
-                        : 'text-gray-400 hover:text-gray-200 hover:bg-arena-bg'
+                        ? 'bg-[#0F1115] text-[#3B82F6] border border-[#2A2F38] font-semibold'
+                        : 'text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#0F1115]/50'
                     }`}
                   >
                     {sub}
@@ -221,17 +218,17 @@ export default function SkillsPage() {
             </div>
 
             {/* Difficulty Filter */}
-            <div className="bg-arena-card border border-arena-border rounded-2xl p-4">
-              <h4 className="text-xs font-mono font-bold uppercase text-gray-400 mb-3 tracking-wider">Difficulty</h4>
-              <div className="space-y-1.5">
+            <div className="bg-[#171A21] border border-[#2A2F38] rounded-xl p-3.5 shadow-sm">
+              <h4 className="text-[11px] font-mono font-bold uppercase text-[#94A3B8] mb-2.5">Difficulty</h4>
+              <div className="space-y-1">
                 {['All', 'Easy', 'Medium', 'Hard'].map((diff) => (
                   <button
                     key={diff}
                     onClick={() => setSelectedDifficulty(diff)}
-                    className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-mono transition ${
+                    className={`w-full text-left px-2.5 py-1 rounded text-xs font-mono transition-all duration-150 ease-out active:scale-95 ${
                       selectedDifficulty === diff
-                        ? 'bg-arena-neonPurple/20 text-arena-neonPurple font-bold'
-                        : 'text-gray-400 hover:text-gray-200 hover:bg-arena-bg'
+                        ? 'bg-[#0F1115] text-[#3B82F6] border border-[#2A2F38] font-semibold'
+                        : 'text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#0F1115]/50'
                     }`}
                   >
                     {diff}
@@ -243,52 +240,44 @@ export default function SkillsPage() {
           </div>
 
           {/* Right Problems List */}
-          <div className="lg:col-span-3 space-y-4">
+          <div className="lg:col-span-3 space-y-2.5">
             {activeProblems.length === 0 ? (
-              <div className="bg-arena-card border border-arena-border rounded-2xl p-12 text-center text-gray-500 font-mono text-sm">
+              <div className="bg-[#171A21] border border-[#2A2F38] rounded-xl p-8 text-center text-[#94A3B8] font-mono text-xs">
                 No challenges found matching your filters.
               </div>
             ) : (
               activeProblems.map((prob) => (
                 <div
                   key={prob.id}
-                  className="bg-arena-card border border-arena-border hover:border-arena-neonCyan/50 rounded-2xl p-5 sm:p-6 transition shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                  className="bg-[#171A21] border border-[#2A2F38] hover:border-[#3B82F6] p-4 rounded-xl transition-all duration-150 ease-out hover:-translate-y-[1px] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
                 >
-                  <div className="space-y-1.5 max-w-xl">
-                    <div className="flex items-center space-x-2.5">
-                      <h3 className="text-base font-bold text-gray-100 group-hover:text-arena-neonCyan transition">
+                  <div className="space-y-1 text-left">
+                    <div className="flex items-center space-x-2">
+                      <h3 className="text-sm font-semibold text-[#F1F5F9] group-hover:text-[#3B82F6] transition-colors duration-150">
                         {prob.title}
                       </h3>
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold ${
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold uppercase ${
                         prob.difficulty === 'Easy'
-                          ? 'bg-emerald-500/15 text-arena-neonGreen border border-emerald-500/30'
+                          ? 'bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/30'
                           : prob.difficulty === 'Medium'
-                          ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30'
-                          : 'bg-red-500/15 text-arena-neonRed border border-red-500/30'
+                          ? 'bg-[#F59E0B]/10 text-[#F59E0B] border border-[#F59E0B]/30'
+                          : 'bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/30'
                       }`}>
                         {prob.difficulty}
                       </span>
                     </div>
 
-                    <div className="flex items-center space-x-2 text-xs font-mono text-gray-500">
-                      <span>{prob.subtopic}</span>
-                      <span>•</span>
-                      <span>15 Points</span>
-                      <span>•</span>
-                      <span className="text-arena-neonGreen">94% AI Pass Rate</span>
-                    </div>
-
-                    <p className="text-xs text-gray-400 leading-relaxed pt-1 line-clamp-2">
+                    <p className="text-xs text-[#94A3B8] line-clamp-1">
                       {prob.description}
                     </p>
                   </div>
 
                   <button
                     onClick={() => handleStartBattle(prob.id)}
-                    className="flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-gradient-to-r from-arena-neonCyan to-arena-neonPurple hover:brightness-110 text-black font-mono font-bold text-xs shrink-0 transition hover:scale-105 shadow-xl glow-cyan"
+                    className="bg-[#3B82F6] hover:bg-[#60A5FA] text-white px-3.5 py-1.5 rounded-lg font-mono font-medium text-xs shrink-0 transition-all duration-150 ease-out hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.98] flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm"
                   >
-                    <Swords className="w-4 h-4" />
-                    <span>Battle on This</span>
+                    <Swords className="w-3.5 h-3.5" />
+                    <span>Battle</span>
                   </button>
                 </div>
               ))

@@ -6,7 +6,7 @@ import { sfx } from '@/utils/soundEffects';
 export interface Reaction {
   id: string;
   emoji: string;
-  left: number; // percentage across screen
+  left: number;
 }
 
 const EMOJI_LIST = ['🔥', '💀', '🚀', '🧠', '💩', '⚡', '👑'];
@@ -30,10 +30,9 @@ export default function FloatingReactions({
       setActiveReactions((prev) => [...prev, latest]);
       sfx.playReactionPop();
 
-      // Clean up after floating animation ends
       const timer = setTimeout(() => {
         setActiveReactions((prev) => prev.filter((r) => r.id !== latest.id));
-      }, 3500);
+      }, 3200);
 
       return () => clearTimeout(timer);
     }
@@ -47,24 +46,24 @@ export default function FloatingReactions({
           <div
             key={r.id}
             style={{ left: `${r.left}%` }}
-            className="absolute bottom-16 text-3xl sm:text-4xl animate-float-up select-none"
+            className="absolute bottom-16 text-2xl sm:text-3xl animate-float-up select-none"
           >
             {r.emoji}
           </div>
         ))}
       </div>
 
-      {/* Spectator Emoji Dock at the bottom */}
+      {/* Spectator Bottom Emoji Dock */}
       {isSpectator && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-arena-card/90 backdrop-blur-md border border-arena-neonPurple/50 px-4 py-2 rounded-2xl shadow-2xl flex items-center space-x-2 glow-purple animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <span className="text-[11px] font-mono font-bold text-arena-neonPurple uppercase tracking-wider mr-1 hidden sm:inline">
-            Cheer:
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-[#171A21] border border-[#2A2F38] px-3.5 py-1.5 rounded-xl shadow-xl flex items-center space-x-1.5 animate-in fade-in duration-200">
+          <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider mr-1 hidden sm:inline">
+            Reaction:
           </span>
           {EMOJI_LIST.map((emoji) => (
             <button
               key={emoji}
               onClick={() => onSendReaction?.(emoji)}
-              className="text-xl sm:text-2xl hover:scale-135 active:scale-95 transition transform duration-150 p-1.5 rounded-lg hover:bg-arena-bg"
+              className="text-lg hover:scale-125 active:scale-95 transition transform duration-150 p-1 rounded hover:bg-[#0F1115]"
               title={`Send ${emoji}`}
             >
               {emoji}

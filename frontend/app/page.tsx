@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Swords, 
   Bot, 
   Award, 
   Coins, 
-  Flame, 
   ArrowRight, 
   Layers, 
   Binary, 
@@ -21,26 +20,26 @@ import {
   Terminal,
   Database,
   Search,
-  Sparkles,
-  Zap
+  Zap,
+  Flame
 } from 'lucide-react';
 
 const CATEGORIES = [
-  { id: 'Algorithms', name: 'Algorithms', icon: Binary, count: 20, desc: 'Sorting, Searching, Dynamic Programming, Two Pointers & Graphs' },
-  { id: 'Data Structures', name: 'Data Structures', icon: Layers, count: 20, desc: 'Arrays, Linked Lists, Stacks, Queues, Trees, Heaps & Hash Tables' },
-  { id: 'Mathematics', name: 'Mathematics', icon: Calculator, count: 20, desc: 'Number Theory, Combinatorics, Sieve of Eratosthenes & Geometry' },
-  { id: 'Artificial Intelligence', name: 'Artificial Intelligence', icon: Bot, count: 20, desc: 'Game Search Trees, Minimax, Heuristics, KNN & Decision Engines' },
-  { id: 'C', name: 'C Language', icon: Cpu, count: 20, desc: 'Pointers, Dynamic Memory (malloc/free), Bitwise & Structs' },
-  { id: 'C++', name: 'C++', icon: Code2, count: 20, desc: 'STL Containers, Custom Functors, RAII, Templates & OOP' },
-  { id: 'Java', name: 'Java', icon: Code2, count: 20, desc: 'Collections Framework, OOP Design Patterns, Streams & Multithreading' },
-  { id: 'Python', name: 'Python', icon: Code2, count: 20, desc: 'List Comprehensions, Generators, Decorators, Itertools & Slicing' },
-  { id: 'Ruby', name: 'Ruby', icon: Sparkles, count: 20, desc: 'Blocks, Enumerable Methods, Hashes, Procs & Metaprogramming' },
-  { id: 'SQL', name: 'SQL', icon: Database, count: 20, desc: 'Aggregations, Window Functions, Self Joins & Subqueries' },
-  { id: 'Databases', name: 'Databases', icon: Database, count: 20, desc: 'ACID Transactions, Indexes, Normalization & Schema Consistency' },
-  { id: 'Linux Shell', name: 'Linux Shell', icon: Terminal, count: 20, desc: 'Bash Scripting, Pipes, grep, awk, sed & Text Processing' },
-  { id: 'Functional Programming', name: 'Functional Programming', icon: Binary, count: 20, desc: 'Currying, Pipe, Pure Functions, Monads & Immutability' },
-  { id: 'Regex', name: 'Regex', icon: Search, count: 20, desc: 'Pattern Matching, Quantifiers, Lookaheads, IP & Email Validation' },
-  { id: 'React', name: 'React', icon: Zap, count: 20, desc: 'Custom Hooks, State Management, Portals & Lifecycle Architecture' },
+  { id: 'Algorithms', name: 'Algorithms', icon: Binary, count: 20, desc: 'Sorting, Searching, Dynamic Programming & Graph Theory' },
+  { id: 'Data Structures', name: 'Data Structures', icon: Layers, count: 20, desc: 'Arrays, Linked Lists, Stacks, Queues, Trees & Hash Maps' },
+  { id: 'Mathematics', name: 'Mathematics', icon: Calculator, count: 20, desc: 'Number Theory, Combinatorics, Sieve & Geometry' },
+  { id: 'Artificial Intelligence', name: 'Artificial Intelligence', icon: Bot, count: 20, desc: 'Game Trees, Minimax, Heuristics & Decision Models' },
+  { id: 'C', name: 'C Language', icon: Cpu, count: 20, desc: 'Pointers, Dynamic Malloc, Bitwise & Struct Memory' },
+  { id: 'C++', name: 'C++', icon: Code2, count: 20, desc: 'STL Containers, Custom Functors, RAII & Templates' },
+  { id: 'Java', name: 'Java', icon: Code2, count: 20, desc: 'Collections Framework, Concurrency, Streams & OOP' },
+  { id: 'Python', name: 'Python', icon: Code2, count: 20, desc: 'Comprehensions, Generators, Decorators & Itertools' },
+  { id: 'Ruby', name: 'Ruby', icon: Zap, count: 20, desc: 'Blocks, Enumerable Methods, Hashes & Metaprogramming' },
+  { id: 'SQL', name: 'SQL', icon: Database, count: 20, desc: 'Window Functions, Aggregations, Joins & Subqueries' },
+  { id: 'Databases', name: 'Databases', icon: Database, count: 20, desc: 'ACID Transactions, Indexes, Normalization & Sharding' },
+  { id: 'Linux Shell', name: 'Linux Shell', icon: Terminal, count: 20, desc: 'Bash Scripting, Pipes, grep, awk & Log Analysis' },
+  { id: 'Functional Programming', name: 'Functional Programming', icon: Binary, count: 20, desc: 'Currying, Pipe, Monads & Pure Functions' },
+  { id: 'Regex', name: 'Regex', icon: Search, count: 20, desc: 'Pattern Matching, Lookaheads, IP & String Parsing' },
+  { id: 'React', name: 'React', icon: Zap, count: 20, desc: 'Custom Hooks, State Architecture & Lifecycle Optimizations' },
 ];
 
 export default function LandingPage() {
@@ -51,17 +50,22 @@ export default function LandingPage() {
   const [selectedSubtopic, setSelectedSubtopic] = useState<string | null>(null);
   const [problems, setProblems] = useState<any[]>([]);
 
-  // Open topic browser modal and fetch all questions
-  const openTopicModal = async () => {
-    try {
-      const res = await fetch('/data/problems.json');
-      if (res.ok) {
-        const data = await res.json();
-        setProblems(data);
+  useEffect(() => {
+    async function fetchProblems() {
+      try {
+        const res = await fetch('/data/problems.json');
+        if (res.ok) {
+          const data = await res.json();
+          setProblems(data);
+        }
+      } catch (err) {
+        console.error(err);
       }
-    } catch {
-      // Fallback
     }
+    fetchProblems();
+  }, []);
+
+  const openTopicModal = () => {
     setSelectedCategory(null);
     setSelectedSubtopic(null);
     setIsModalOpen(true);
@@ -83,7 +87,6 @@ export default function LandingPage() {
     router.push(`/battle/${customRoomId.trim()}`);
   };
 
-  // Subtopics generator
   const availableSubtopics = selectedCategory
     ? Array.from(new Set(problems.filter((p) => p.category === selectedCategory).map((p) => p.subtopic)))
     : [];
@@ -93,97 +96,96 @@ export default function LandingPage() {
   );
 
   return (
-    <div className="relative overflow-hidden">
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-arena-neonCyan/15 via-arena-neonPurple/15 to-arena-neonRed/10 blur-[130px] -z-10 pointer-events-none" />
-
+    <div className="min-h-screen bg-[#0F1115] text-[#CBD5E1]">
+      
       {/* Hero Section */}
-      <section className="max-w-6xl mx-auto px-4 pt-16 pb-20 text-center">
-        <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full border border-arena-neonCyan/40 bg-arena-neonCyan/5 text-arena-neonCyan text-xs font-mono mb-8 glow-cyan">
-          <span className="w-2 h-2 rounded-full bg-arena-neonCyan animate-ping" />
+      <section className="max-w-5xl mx-auto px-4 pt-12 sm:pt-16 pb-12 sm:pb-16 text-center">
+        
+        {/* Status Badge */}
+        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full border border-[#2A2F38] bg-[#171A21] text-[#94A3B8] text-xs font-mono mb-6 transition-all duration-200 hover:border-[#3B82F6]/50">
+          <span className="w-2 h-2 rounded-full bg-[#22C55E]" />
           <span>15 PRACTICE DOMAINS • LIVE 1V1 AI CODING ARENA</span>
         </div>
 
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight">
+        {/* Heading */}
+        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[#F1F5F9] max-w-4xl mx-auto leading-tight">
           Where Developers <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-arena-neonCyan via-indigo-400 to-arena-neonPurple">
-            Battle for Code Supremacy
-          </span>
+          <span className="text-[#3B82F6]">Battle for Code Supremacy</span>
         </h1>
 
-        <p className="mt-6 text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
-          Select from 15 HackerRank-style domains (Algorithms, SQL, C, React, AI), enter real-time Monaco editor battles, get judged by <span className="text-arena-neonCyan font-semibold">Gemini AI</span>, and mint Soulbound reputation badges.
+        <p className="mt-4 text-xs sm:text-sm text-[#94A3B8] max-w-2xl mx-auto leading-relaxed">
+          Race side-by-side in Monaco code editors. Evaluated by Gemini AI on Big-O complexity and code elegance, backed by trustless on-chain reputation.
         </p>
 
-        {/* CTA Arena Launcher */}
-        <div className="mt-10 max-w-md mx-auto bg-arena-card border border-arena-border p-6 rounded-2xl glow-purple shadow-2xl">
-          <h3 className="text-sm font-mono text-gray-300 mb-4 uppercase tracking-wider text-left flex items-center justify-between">
+        {/* Action Card with tactile buttons & smooth focus inputs */}
+        <div className="mt-8 max-w-md mx-auto bg-[#171A21] border border-[#2A2F38] p-5 rounded-2xl text-left space-y-3 shadow-lg transition-all duration-200">
+          <div className="flex items-center justify-between text-xs font-mono text-[#F1F5F9] font-semibold uppercase tracking-wider mb-2">
             <span>Choose Your Challenge</span>
-            <Flame className="h-4 w-4 text-arena-neonRed animate-bounce" />
-          </h3>
-
-          <div className="space-y-3">
-            <button
-              onClick={openTopicModal}
-              className="w-full flex items-center justify-center space-x-2 py-3.5 px-6 rounded-xl bg-gradient-to-r from-arena-neonCyan to-arena-neonPurple text-black font-bold text-base hover:opacity-95 hover:scale-[1.02] transition-all duration-200 cursor-pointer shadow-xl glow-cyan"
-            >
-              <Swords className="h-5 w-5" />
-              <span>Browse 15 Domains & Battle</span>
-            </button>
-
-            <button
-              onClick={handleQuickBattle}
-              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-arena-bg border border-arena-border hover:border-arena-neonPurple text-gray-300 hover:text-white font-mono text-xs transition"
-            >
-              <Shuffle className="h-4 w-4 text-arena-neonPurple" />
-              <span>Quick Match (Random Challenge)</span>
-            </button>
-
-            <div className="flex items-center my-2 text-xs text-gray-500 font-mono">
-              <span className="flex-1 border-t border-arena-border"></span>
-              <span className="px-3">OR ENTER ROOM ID</span>
-              <span className="flex-1 border-t border-arena-border"></span>
-            </div>
-
-            <form onSubmit={handleJoinRoom} className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Enter Room Code (e.g. battle-x92a)"
-                value={customRoomId}
-                onChange={(e) => setCustomRoomId(e.target.value)}
-                className="flex-1 bg-arena-bg border border-arena-border rounded-xl px-4 py-2.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-arena-neonCyan transition font-mono"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2.5 bg-arena-card border border-arena-border hover:border-arena-neonPurple rounded-xl text-gray-200 hover:text-arena-neonPurple transition flex items-center justify-center"
-              >
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </form>
+            <Flame className="w-3.5 h-3.5 text-[#F59E0B]" />
           </div>
+
+          <button
+            onClick={openTopicModal}
+            className="w-full bg-[#3B82F6] hover:bg-[#60A5FA] text-white py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center space-x-2 transition-all duration-150 ease-out hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.98] cursor-pointer shadow-sm"
+          >
+            <Swords className="h-4 w-4" />
+            <span>Browse 15 Domains & Battle</span>
+          </button>
+
+          <button
+            onClick={handleQuickBattle}
+            className="w-full bg-[#0F1115] hover:bg-[#1E232B] border border-[#2A2F38] hover:border-[#2A2F38]/90 text-[#CBD5E1] hover:text-white py-2 px-3 rounded-xl text-xs font-medium flex items-center justify-center space-x-1.5 transition-all duration-150 ease-out hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.98] cursor-pointer"
+          >
+            <Shuffle className="h-3.5 w-3.5 text-[#94A3B8]" />
+            <span>Quick Match (Random Challenge)</span>
+          </button>
+
+          <div className="flex items-center my-2 text-[10px] text-[#94A3B8] font-mono">
+            <span className="flex-1 border-t border-[#2A2F38]"></span>
+            <span className="px-2.5 uppercase">OR ENTER ROOM ID</span>
+            <span className="flex-1 border-t border-[#2A2F38]"></span>
+          </div>
+
+          <form onSubmit={handleJoinRoom} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="e.g. battle-x92a"
+              value={customRoomId}
+              onChange={(e) => setCustomRoomId(e.target.value)}
+              className="flex-1 bg-[#0F1115] border border-[#2A2F38] rounded-xl px-3 py-1.5 text-xs text-[#F1F5F9] placeholder-[#94A3B8]/60 focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6]/20 font-mono transition-all duration-150"
+            />
+            <button
+              type="submit"
+              className="bg-[#0F1115] hover:bg-[#1E232B] border border-[#2A2F38] hover:border-[#3B82F6] text-[#F1F5F9] px-3.5 py-1.5 rounded-xl text-xs flex items-center justify-center transition-all duration-150 active:scale-95"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </form>
         </div>
+
       </section>
 
-      {/* 🌟 3-TIER 15-DOMAIN SELECTION DASHBOARD MODAL 🌟 */}
+      {/* 🌟 3-TIER DOMAIN SELECTION MODAL (Smooth Scale + Fade In) 🌟 */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-arena-card border border-arena-border max-w-5xl w-full max-h-[85vh] rounded-3xl p-6 sm:p-8 glow-cyan shadow-2xl flex flex-col relative animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 transition-opacity duration-200">
+          <div className="bg-[#171A21] border border-[#2A2F38] max-w-4xl w-full max-h-[85vh] rounded-2xl p-5 sm:p-6 flex flex-col relative shadow-2xl animate-modal-in">
             
-            {/* Breadcrumb Navigation */}
-            <div className="flex items-center justify-between pb-4 border-b border-arena-border">
-              <div className="flex items-center space-x-2 text-xs sm:text-sm font-mono overflow-x-auto">
+            {/* Modal Header & Breadcrumbs */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#2A2F38]">
+              <div className="flex items-center space-x-2 text-xs font-mono">
                 <button
                   onClick={() => { setSelectedCategory(null); setSelectedSubtopic(null); }}
-                  className={`hover:text-arena-neonCyan transition ${!selectedCategory ? 'text-arena-neonCyan font-bold' : 'text-gray-400'}`}
+                  className={`transition-colors duration-150 ${!selectedCategory ? 'text-[#3B82F6] font-bold' : 'text-[#94A3B8] hover:text-[#CBD5E1]'}`}
                 >
                   1. All 15 Domains
                 </button>
 
                 {selectedCategory && (
                   <>
-                    <ChevronRight className="w-4 h-4 text-gray-600 shrink-0" />
+                    <ChevronRight className="w-3.5 h-3.5 text-[#94A3B8] shrink-0" />
                     <button
                       onClick={() => setSelectedSubtopic(null)}
-                      className={`hover:text-arena-neonCyan transition shrink-0 ${!selectedSubtopic ? 'text-arena-neonCyan font-bold' : 'text-gray-400'}`}
+                      className={`transition-colors duration-150 shrink-0 ${!selectedSubtopic ? 'text-[#3B82F6] font-bold' : 'text-[#94A3B8] hover:text-[#CBD5E1]'}`}
                     >
                       2. {selectedCategory}
                     </button>
@@ -192,57 +194,56 @@ export default function LandingPage() {
 
                 {selectedSubtopic && (
                   <>
-                    <ChevronRight className="w-4 h-4 text-gray-600 shrink-0" />
-                    <span className="text-arena-neonGreen font-bold shrink-0">3. {selectedSubtopic}</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-[#94A3B8] shrink-0" />
+                    <span className="text-[#22C55E] font-bold shrink-0">3. {selectedSubtopic}</span>
                   </>
                 )}
               </div>
 
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-arena-border transition"
+                className="p-1 rounded-md text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#0F1115] transition-colors duration-150 active:scale-95"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto py-6">
+            <div className="flex-1 overflow-y-auto py-4 text-left">
               
-              {/* LEVEL 1: 15-DOMAIN GRID (Matching HackerRank Screenshot) */}
+              {/* LEVEL 1: ALL DOMAINS (1-2px lift on hover) */}
               {!selectedCategory && (
-                <div className="space-y-4">
-                  <div className="text-left mb-6">
-                    <h2 className="text-2xl font-extrabold text-gray-100">Practice Skills & Domains</h2>
-                    <p className="text-xs text-gray-400 font-mono mt-1">Select a discipline to start your 1v1 arena challenge.</p>
+                <div className="space-y-3">
+                  <div className="mb-2">
+                    <h3 className="text-sm sm:text-base font-bold text-[#F1F5F9]">Practice Skills & Domains</h3>
+                    <p className="text-xs text-[#94A3B8]">Select a discipline to start your 1v1 arena challenge.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {CATEGORIES.map((cat) => {
                       const Icon = cat.icon;
                       return (
                         <div
                           key={cat.id}
                           onClick={() => setSelectedCategory(cat.id)}
-                          className="bg-arena-bg border border-arena-border hover:border-arena-neonCyan/70 rounded-2xl p-5 transition duration-200 cursor-pointer group shadow-lg hover:scale-[1.02]"
+                          className="bg-[#0F1115] border border-[#2A2F38] hover:border-[#3B82F6] p-3.5 sm:p-4 rounded-xl cursor-pointer flex flex-col justify-between transition-all duration-200 ease-out hover:-translate-y-[2px] active:translate-y-0 group shadow-sm"
                         >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="p-2.5 rounded-xl bg-arena-neonCyan/10 text-arena-neonCyan border border-arena-neonCyan/30 group-hover:scale-110 transition">
-                              <Icon className="w-5 h-5" />
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="p-1.5 rounded-md bg-[#171A21] border border-[#2A2F38] text-[#3B82F6] transition-transform duration-200 group-hover:scale-105">
+                                <Icon className="w-4 h-4" />
+                              </div>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#171A21] text-[#94A3B8] border border-[#2A2F38]">
+                                {cat.count} Challenges
+                              </span>
                             </div>
-                            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
-                              {cat.count} Challenges
-                            </span>
+                            <h4 className="text-xs sm:text-sm font-semibold text-[#F1F5F9] group-hover:text-[#3B82F6] transition-colors duration-150">{cat.name}</h4>
+                            <p className="text-[11px] text-[#94A3B8] mt-1 line-clamp-2 leading-relaxed">{cat.desc}</p>
                           </div>
-                          <h3 className="font-bold text-gray-100 group-hover:text-arena-neonCyan transition">
-                            {cat.name}
-                          </h3>
-                          <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-relaxed">
-                            {cat.desc}
-                          </p>
-                          <div className="mt-4 pt-3 border-t border-arena-border/50 flex items-center justify-between text-xs font-mono text-arena-neonCyan">
+
+                          <div className="mt-3 pt-2 border-t border-[#2A2F38] flex items-center justify-between text-[11px] text-[#94A3B8] group-hover:text-[#3B82F6] font-mono transition-colors duration-150">
                             <span>Explore Subtopics</span>
-                            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                            <ChevronRight className="w-3.5 h-3.5 transition-transform duration-200 ease-out group-hover:translate-x-1" />
                           </div>
                         </div>
                       );
@@ -253,47 +254,37 @@ export default function LandingPage() {
 
               {/* LEVEL 2: SUBTOPICS */}
               {selectedCategory && !selectedSubtopic && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="text-left">
-                      <h2 className="text-xl font-bold text-gray-100">{selectedCategory} Subtopics</h2>
-                      <p className="text-xs text-gray-400 font-mono mt-1">Select an exact algorithmic technique or concept.</p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-[#F1F5F9]">{selectedCategory} Subtopics</h3>
+                      <p className="text-xs text-[#94A3B8]">Select an exact algorithmic concept.</p>
                     </div>
                     <button
                       onClick={() => setSelectedCategory(null)}
-                      className="flex items-center space-x-1 text-xs font-mono text-arena-neonCyan hover:underline"
+                      className="bg-[#0F1115] hover:bg-[#1E232B] border border-[#2A2F38] text-[#CBD5E1] px-2.5 py-1 rounded-md text-xs flex items-center space-x-1 transition-all duration-150 active:scale-95"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
-                      <span>Back to All Domains</span>
+                      <span>Back</span>
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {availableSubtopics.map((sub) => {
-                      const count = problems.filter(
-                        (p) => p.category === selectedCategory && p.subtopic === sub
-                      ).length;
-
+                      const count = problems.filter((p) => p.category === selectedCategory && p.subtopic === sub).length;
                       return (
                         <div
                           key={sub}
                           onClick={() => setSelectedSubtopic(sub)}
-                          className="bg-arena-bg border border-arena-border hover:border-arena-neonPurple/70 rounded-2xl p-5 transition duration-200 cursor-pointer group shadow-lg hover:scale-[1.02]"
+                          className="bg-[#0F1115] border border-[#2A2F38] hover:border-[#3B82F6] p-3.5 sm:p-4 rounded-xl cursor-pointer flex flex-col justify-between transition-all duration-200 ease-out hover:-translate-y-[2px] active:translate-y-0 group"
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-mono font-bold text-arena-neonPurple uppercase">
-                              SUBTOPIC
-                            </span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-800 text-gray-400">
-                              {count} {count === 1 ? 'Challenge' : 'Challenges'}
-                            </span>
+                          <div>
+                            <span className="text-[10px] font-mono uppercase text-[#94A3B8] font-bold block mb-1">SUBTOPIC</span>
+                            <h4 className="text-xs sm:text-sm font-semibold text-[#F1F5F9] group-hover:text-[#3B82F6] transition-colors duration-150">{sub}</h4>
                           </div>
-                          <h3 className="text-base font-bold text-gray-100 group-hover:text-arena-neonPurple transition">
-                            {sub}
-                          </h3>
-                          <div className="mt-4 pt-3 border-t border-arena-border/50 flex items-center justify-between text-xs font-mono text-arena-neonPurple">
-                            <span>View Questions</span>
-                            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                          <div className="mt-3 pt-2 border-t border-[#2A2F38] flex items-center justify-between text-[11px] text-[#94A3B8] group-hover:text-[#3B82F6] font-mono transition-colors duration-150">
+                            <span>{count} {count === 1 ? 'Challenge' : 'Challenges'}</span>
+                            <ChevronRight className="w-3.5 h-3.5 transition-transform duration-200 ease-out group-hover:translate-x-1" />
                           </div>
                         </div>
                       );
@@ -302,57 +293,53 @@ export default function LandingPage() {
                 </div>
               )}
 
-              {/* LEVEL 3: PROBLEMS & BATTLE LAUNCHER */}
+              {/* LEVEL 3: CHALLENGES */}
               {selectedCategory && selectedSubtopic && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="text-left">
-                      <h2 className="text-xl font-bold text-gray-100">{selectedSubtopic} Challenges</h2>
-                      <p className="text-xs text-gray-400 font-mono mt-1">Pick a challenge to launch your 1v1 battle arena!</p>
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-[#F1F5F9]">{selectedSubtopic} Challenges</h3>
+                      <p className="text-xs text-[#94A3B8]">Pick a challenge to launch your 1v1 battle arena!</p>
                     </div>
                     <button
                       onClick={() => setSelectedSubtopic(null)}
-                      className="flex items-center space-x-1 text-xs font-mono text-arena-neonCyan hover:underline"
+                      className="bg-[#0F1115] hover:bg-[#1E232B] border border-[#2A2F38] text-[#CBD5E1] px-2.5 py-1 rounded-md text-xs flex items-center space-x-1 transition-all duration-150 active:scale-95"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
-                      <span>Back to Subtopics</span>
+                      <span>Back</span>
                     </button>
                   </div>
 
-                  <div className="space-y-3">
-                    {matchingProblems.map((prob) => (
-                      <div
-                        key={prob.id}
-                        className="bg-arena-bg border border-arena-border hover:border-arena-neonCyan/60 rounded-2xl p-5 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
-                      >
-                        <div className="space-y-1 max-w-lg text-left">
-                          <div className="flex items-center space-x-2">
-                            <h3 className="text-base font-bold text-gray-100 group-hover:text-arena-neonCyan transition">
-                              {prob.title}
-                            </h3>
-                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold ${
-                              prob.difficulty === 'Easy'
-                                ? 'bg-emerald-500/15 text-arena-neonGreen border border-emerald-500/30'
-                                : 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30'
-                            }`}>
-                              {prob.difficulty}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-400 leading-relaxed">
-                            {prob.description}
-                          </p>
+                  {matchingProblems.map((prob) => (
+                    <div
+                      key={prob.id}
+                      className="bg-[#0F1115] border border-[#2A2F38] hover:border-[#3B82F6] p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all duration-150 ease-out hover:-translate-y-[1px]"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="text-xs sm:text-sm font-semibold text-[#F1F5F9]">{prob.title}</h4>
+                          <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold uppercase ${
+                            prob.difficulty === 'Easy'
+                              ? 'bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/30'
+                              : prob.difficulty === 'Medium'
+                              ? 'bg-[#F59E0B]/10 text-[#F59E0B] border border-[#F59E0B]/30'
+                              : 'bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/30'
+                          }`}>
+                            {prob.difficulty}
+                          </span>
                         </div>
-
-                        <button
-                          onClick={() => handleLaunchProblemBattle(prob.id)}
-                          className="flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-gradient-to-r from-arena-neonCyan to-arena-neonPurple hover:brightness-110 text-black font-mono font-bold text-xs shrink-0 transition hover:scale-105 shadow-xl glow-cyan"
-                        >
-                          <Swords className="w-4 h-4" />
-                          <span>Battle on This</span>
-                        </button>
+                        <p className="text-xs text-[#94A3B8] line-clamp-1">{prob.description}</p>
                       </div>
-                    ))}
-                  </div>
+
+                      <button
+                        onClick={() => handleLaunchProblemBattle(prob.id)}
+                        className="bg-[#3B82F6] hover:bg-[#60A5FA] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 shrink-0 transition-all duration-150 ease-out hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.98]"
+                      >
+                        <Swords className="w-3.5 h-3.5" />
+                        <span>Battle on This</span>
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -362,54 +349,55 @@ export default function LandingPage() {
         </div>
       )}
 
-      {/* Feature Grid */}
-      <section className="max-w-6xl mx-auto px-4 py-16 border-t border-arena-border/60">
-        <h2 className="text-center text-2xl font-bold tracking-tight text-gray-200 mb-12">
-          Engineered for Competitive Developers
+      {/* Feature Grid with subtle 1px raise on hover */}
+      <section className="max-w-5xl mx-auto px-4 py-12 border-t border-[#2A2F38]">
+        <h2 className="text-center text-base sm:text-lg font-semibold text-[#F1F5F9] mb-6">
+          Engineered for competitive developers
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-arena-card/60 border border-arena-border p-6 rounded-2xl hover:border-arena-neonCyan/60 transition group">
-            <div className="w-12 h-12 rounded-xl bg-arena-neonCyan/10 border border-arena-neonCyan/30 flex items-center justify-center mb-4 text-arena-neonCyan group-hover:scale-110 transition-transform">
-              <Swords className="h-6 w-6" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-left">
+          <div className="bg-[#171A21] border border-[#2A2F38] p-4 rounded-xl space-y-1.5 transition-all duration-200 ease-out hover:-translate-y-[2px] hover:border-[#3B82F6]/50">
+            <div className="w-7 h-7 rounded-lg bg-[#0F1115] border border-[#2A2F38] flex items-center justify-center text-[#3B82F6]">
+              <Swords className="h-3.5 w-3.5" />
             </div>
-            <h3 className="text-lg font-bold text-gray-100">Live 1v1 Split Arena</h3>
-            <p className="mt-2 text-sm text-gray-400 leading-relaxed">
-              Monaco code editors supporting 15 disciplines with live keystroke feedback.
+            <h3 className="text-xs sm:text-sm font-semibold text-[#F1F5F9]">Live 1v1 Split Arena</h3>
+            <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+              Monaco code editors in C, Python, and JS with sub-50ms keystroke synchronization.
             </p>
           </div>
 
-          <div className="bg-arena-card/60 border border-arena-border p-6 rounded-2xl hover:border-arena-neonPurple/60 transition group">
-            <div className="w-12 h-12 rounded-xl bg-arena-neonPurple/10 border border-arena-neonPurple/30 flex items-center justify-center mb-4 text-arena-neonPurple group-hover:scale-110 transition-transform">
-              <Bot className="h-6 w-6" />
+          <div className="bg-[#171A21] border border-[#2A2F38] p-4 rounded-xl space-y-1.5 transition-all duration-200 ease-out hover:-translate-y-[2px] hover:border-[#F59E0B]/50">
+            <div className="w-7 h-7 rounded-lg bg-[#0F1115] border border-[#2A2F38] flex items-center justify-center text-[#F59E0B]">
+              <Bot className="h-3.5 w-3.5" />
             </div>
-            <h3 className="text-lg font-bold text-gray-100">Gemini AI Referee</h3>
-            <p className="mt-2 text-sm text-gray-400 leading-relaxed">
-              Google Gemini scores time complexity, code aesthetics, and delivers dual-channel commentary.
+            <h3 className="text-xs sm:text-sm font-semibold text-[#F1F5F9]">Gemini AI Referee</h3>
+            <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+              Automated grading on Big-O space-time complexity, correctness, and live voice commentary.
             </p>
           </div>
 
-          <div className="bg-arena-card/60 border border-arena-border p-6 rounded-2xl hover:border-yellow-500/60 transition group">
-            <div className="w-12 h-12 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center mb-4 text-yellow-400 group-hover:scale-110 transition-transform">
-              <Coins className="h-6 w-6" />
+          <div className="bg-[#171A21] border border-[#2A2F38] p-4 rounded-xl space-y-1.5 transition-all duration-200 ease-out hover:-translate-y-[2px] hover:border-[#22C55E]/50">
+            <div className="w-7 h-7 rounded-lg bg-[#0F1115] border border-[#2A2F38] flex items-center justify-center text-[#22C55E]">
+              <Coins className="h-3.5 w-3.5" />
             </div>
-            <h3 className="text-lg font-bold text-gray-100">Polygon Amoy Escrow</h3>
-            <p className="mt-2 text-sm text-gray-400 leading-relaxed">
-              Smart contracts escrow both players' testnet stakes and instantly release the pot to the victor.
+            <h3 className="text-xs sm:text-sm font-semibold text-[#F1F5F9]">Trustless Escrow</h3>
+            <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+              Smart contracts hold micro-stakes on Polygon Amoy and release the prize to the victor.
             </p>
           </div>
 
-          <div className="bg-arena-card/60 border border-arena-border p-6 rounded-2xl hover:border-arena-neonRed/60 transition group">
-            <div className="w-12 h-12 rounded-xl bg-arena-neonRed/10 border border-arena-neonRed/30 flex items-center justify-center mb-4 text-arena-neonRed group-hover:scale-110 transition-transform">
-              <Award className="h-6 w-6" />
+          <div className="bg-[#171A21] border border-[#2A2F38] p-4 rounded-xl space-y-1.5 transition-all duration-200 ease-out hover:-translate-y-[2px] hover:border-[#3B82F6]/50">
+            <div className="w-7 h-7 rounded-lg bg-[#0F1115] border border-[#2A2F38] flex items-center justify-center text-[#3B82F6]">
+              <Award className="h-3.5 w-3.5" />
             </div>
-            <h3 className="text-lg font-bold text-gray-100">Soulbound Badges</h3>
-            <p className="mt-2 text-sm text-gray-400 leading-relaxed">
-              Non-transferable on-chain ERC-721 NFT badges update with every battle won.
+            <h3 className="text-xs sm:text-sm font-semibold text-[#F1F5F9]">Soulbound Badges</h3>
+            <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+              Non-transferable on-chain ERC-721 tokens verifying authentic developer skill.
             </p>
           </div>
         </div>
       </section>
+
     </div>
   );
 }

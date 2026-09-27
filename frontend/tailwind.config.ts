@@ -9,18 +9,24 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        arena: {
-          bg: '#0a0d14',
-          card: '#111827',
-          border: '#1f2937',
-          neonCyan: '#00f2fe',
-          neonPurple: '#9d4edd',
-          neonRed: '#ff0055',
-          neonGreen: '#00ff66',
+        cp: {
+          bg: '#0F1115',
+          nav: '#0B0D10',
+          card: '#171A21',
+          border: '#2A2F38',
+          blue: '#3B82F6',
+          blueHover: '#60A5FA',
+          heading: '#F1F5F9',
+          text: '#CBD5E1',
+          muted: '#94A3B8',
+          success: '#22C55E',
+          accent: '#F59E0B',
+          error: '#EF4444',
         },
       },
     },
   },
   plugins: [],
 };
+
 export default config;
