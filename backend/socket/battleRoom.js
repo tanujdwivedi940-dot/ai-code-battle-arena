@@ -41,9 +41,26 @@
 
 // const rooms = new Map();
 
-// // 🤖 FAST, REALISTIC HUMAN-LIKE AI TYPING SIMULATOR
+// // Helper to append events to the immutable battle audit log
+// function recordAuditEvent(room, eventType, player, metadata = {}) {
+//   if (!room) return;
+//   const auditEntry = {
+//     id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+//     timestamp: Date.now(),
+//     roomId: room.roomId,
+//     playerId: player?.id || 'system',
+//     playerSlot: player?.slot || 'system',
+//     walletAddress: player?.walletAddress || 'system',
+//     eventType,
+//     metadata,
+//   };
+//   room.auditLog.push(auditEntry);
+//   console.log(`🛡️ [ANTI-CHEAT] [${room.roomId}] [${eventType}] Player: ${player?.slot || 'system'} (${player?.walletAddress || 'N/A'})`);
+//   return auditEntry;
+// }
+
+// // 🤖 REALISTIC HUMAN-LIKE AI TYPING SIMULATOR
 // async function startBotTypingSimulation(io, room, botPlayer, difficulty = 'intermediate') {
-//   // ⚡ Fetches 100% problem-relevant code for any of the 300 problems instantly
 //   const targetCode = await getUniversalBotCode(room.problem, difficulty, botPlayer.language);
 //   let currentIdx = 0;
 //   const totalChars = targetCode.length;
@@ -62,7 +79,7 @@
 //         return;
 //       }
 
-//       if (Math.random() < 0.05) return; // natural pause
+//       if (Math.random() < 0.05) return;
 
 //       const randomChunk = charsPerTick[Math.floor(Math.random() * charsPerTick.length)];
 //       currentIdx = Math.min(totalChars, currentIdx + randomChunk);
@@ -93,6 +110,7 @@
 //   }, initialThinkTimeMs);
 // }
 
+// // 🚀 START BATTLE TRIGGER
 // async function checkAndStartBattle(io, room) {
 //   const playerList = Object.values(room.players);
 //   const allReady = playerList.length === 2 && playerList.every((p) => p.ready);
@@ -100,6 +118,13 @@
 //   if (allReady && room.battleState === 'waiting') {
 //     room.battleState = 'in-progress';
 //     room.startTime = Date.now();
+
+//     recordAuditEvent(room, 'BATTLE_STARTED', null, {
+//       durationSeconds: room.durationSeconds,
+//       problemId: room.problem.id,
+//       player1: playerList[0].walletAddress,
+//       player2: playerList[1].walletAddress,
+//     });
 
 //     io.to(room.roomId).emit('battle_start', {
 //       problem: room.problem,
@@ -131,10 +156,119 @@
 //     persona: room.persona,
 //     durationSeconds: room.durationSeconds,
 //     stakeAmount: room.stakeAmount || '0.005',
+//     auditLog: room.auditLog,
 //     result: room.result,
 //   });
 // }
 
+// // 🚨 TERMINATE BATTLE DUE TO ANTI-CHEAT VIOLATION
+// async function terminateBattleForCheating(io, room, disqualifiedPlayer, reasonType, reasonMessage) {
+//   if (room.battleState !== 'in-progress') return;
+
+//   // Clear any active timers on player
+//   if (disqualifiedPlayer.tabSwitchTimer) {
+//     clearTimeout(disqualifiedPlayer.tabSwitchTimer);
+//     disqualifiedPlayer.tabSwitchTimer = null;
+//   }
+//   disqualifiedPlayer.isTabAway = false;
+
+//   recordAuditEvent(room, reasonType, disqualifiedPlayer, { reason: reasonMessage });
+//   recordAuditEvent(room, 'BATTLE_TERMINATED', disqualifiedPlayer, {
+//     disqualified: disqualifiedPlayer.walletAddress,
+//     reason: reasonMessage,
+//   });
+
+//   room.battleState = 'completed';
+
+//   const playerList = Object.values(room.players);
+//   const p1 = playerList.find((p) => p.slot === 'player1') || playerList[0];
+//   const p2 = playerList.find((p) => p.slot === 'player2') || playerList[1] || p1;
+
+//   const opponent = playerList.find((p) => p.id !== disqualifiedPlayer.id) || disqualifiedPlayer;
+//   const isP1Disqualified = disqualifiedPlayer.slot === 'player1';
+
+//   // Build Disqualification Result Payload with code preservation
+//   const terminationResult = {
+//     winnerAddress: opponent.walletAddress,
+//     isDisqualified: true,
+//     disqualifiedPlayerAddress: disqualifiedPlayer.walletAddress,
+//     reasoning: `BATTLE TERMINATED: ${disqualifiedPlayer.walletAddress.substring(0, 6)} was disqualified for anti-cheat violation (${reasonMessage}).`,
+//     comparisonAnalysis: `Opponent ${opponent.walletAddress.substring(0, 6)} was awarded victory by referee disqualification ruling.`,
+//     auditLog: room.auditLog,
+//     scores: {
+//       player1: {
+//         address: p1.walletAddress,
+//         code: p1.code || '// Preserved code',
+//         language: p1.language || 'c',
+//         grade: isP1Disqualified ? 'F' : 'S+',
+//         testCasesPassed: isP1Disqualified ? 'DISQUALIFIED' : 'AWARDED',
+//         correctness: isP1Disqualified ? 0 : 40,
+//         timeComplexityScore: isP1Disqualified ? 0 : 25,
+//         spaceComplexityScore: isP1Disqualified ? 0 : 15,
+//         cleanliness: isP1Disqualified ? 0 : 20,
+//         total: isP1Disqualified ? 0 : 100,
+//         scoreDeductions: isP1Disqualified ? ['-100 pts: Disqualified for Anti-Cheat Violation (Tab Switching)'] : [],
+//         scoreBonuses: !isP1Disqualified ? ['Victory by Opponent Disqualification'] : [],
+//         feedback: isP1Disqualified 
+//           ? `Match terminated: ${reasonMessage}. Repeatedly switching tabs or leaving the arena during combat is prohibited.`
+//           : 'Awarded default victory due to opponent disqualification for anti-cheat violations.',
+//         mistakes: isP1Disqualified ? [reasonMessage] : [],
+//       },
+//       player2: {
+//         address: p2.walletAddress,
+//         code: p2.code || '// Preserved code',
+//         language: p2.language || 'c',
+//         grade: !isP1Disqualified ? 'F' : 'S+',
+//         testCasesPassed: !isP1Disqualified ? 'DISQUALIFIED' : 'AWARDED',
+//         correctness: !isP1Disqualified ? 0 : 40,
+//         timeComplexityScore: !isP1Disqualified ? 0 : 25,
+//         spaceComplexityScore: !isP1Disqualified ? 0 : 15,
+//         cleanliness: !isP1Disqualified ? 0 : 20,
+//         total: !isP1Disqualified ? 0 : 100,
+//         scoreDeductions: !isP1Disqualified ? ['-100 pts: Disqualified for Anti-Cheat Violation (Tab Switching)'] : [],
+//         scoreBonuses: isP1Disqualified ? ['Victory by Opponent Disqualification'] : [],
+//         feedback: !isP1Disqualified 
+//           ? `Match terminated: ${reasonMessage}. Repeatedly switching tabs or leaving the arena during combat is prohibited.`
+//           : 'Awarded default victory due to opponent disqualification for anti-cheat violations.',
+//         mistakes: !isP1Disqualified ? [reasonMessage] : [],
+//       },
+//     },
+//     optimalSolution: {
+//       language: 'javascript',
+//       timeComplexity: 'O(N)',
+//       spaceComplexity: 'O(1)',
+//       code: `// Optimal solution for ${room.problem.title}\nfunction solveOptimal(...args) {\n  return true;\n}`,
+//       explanation: 'Match concluded prematurely due to anti-cheat rule enforcement.',
+//     },
+//     highlightQuote: `Referee ruling: Disqualification issued for ${disqualifiedPlayer.walletAddress.substring(0, 6)}!`,
+//   };
+
+//   room.result = terminationResult;
+
+//   io.to(room.roomId).emit('ai_commentary', {
+//     text: `🚨 REFEREE RULING: ${disqualifiedPlayer.walletAddress.substring(0, 6)} was disqualified for tab switching violation!`,
+//     timestamp: Date.now(),
+//   });
+
+//   io.to(room.roomId).emit('battle_completed', {
+//     result: terminationResult,
+//   });
+
+//   io.to(room.roomId).emit('room_state', {
+//     roomId: room.roomId,
+//     problem: room.problem,
+//     players: Object.values(room.players),
+//     spectatorCount: room.spectatorIds.size,
+//     battleState: room.battleState,
+//     persona: room.persona,
+//     durationSeconds: room.durationSeconds,
+//     stakeAmount: room.stakeAmount || '0.005',
+//     auditLog: room.auditLog,
+//     result: room.result,
+//   });
+// }
+
+// // 💰 AUTOMATED COMPLETION
 // async function checkBattleCompletion(io, room) {
 //   const playerList = Object.values(room.players);
 //   const allSubmitted = playerList.length === 2 && playerList.every((p) => p.submitted);
@@ -152,6 +286,7 @@
 //       persona: room.persona,
 //       durationSeconds: room.durationSeconds,
 //       stakeAmount: room.stakeAmount || '0.005',
+//       auditLog: room.auditLog,
 //       result: null,
 //     });
 
@@ -185,6 +320,12 @@
 
 //     aiVerdict.payoutTxHash = payoutTxHash;
 //     aiVerdict.payoutAmount = hasBot ? '0' : (parseFloat(room.stakeAmount || '0.005') * 2).toFixed(3);
+//     aiVerdict.auditLog = room.auditLog;
+
+//     recordAuditEvent(room, 'BATTLE_COMPLETED_NORMALLY', null, {
+//       winner: aiVerdict.winnerAddress,
+//       payoutAmount: aiVerdict.payoutAmount,
+//     });
 
 //     room.result = aiVerdict;
 //     room.battleState = 'completed';
@@ -203,6 +344,7 @@
 //     persona: room.persona,
 //     durationSeconds: room.durationSeconds,
 //     stakeAmount: room.stakeAmount || '0.005',
+//     auditLog: room.auditLog,
 //     result: room.result,
 //   });
 // }
@@ -233,6 +375,7 @@
 //           startTime: null,
 //           submissions: {},
 //           result: null,
+//           auditLog: [], // 🛡️ Immutable battle audit timeline
 //           lastPublicTimestamp: 0,
 //           lastSpectatorTimestamp: 0,
 //         });
@@ -274,6 +417,9 @@
 //             starterCode: starterCode || room.problem.starterCode,
 //             submitted: false,
 //             lastAction: 'idle',
+//             tabSwitchCount: 0,
+//             isTabAway: false,
+//             tabSwitchTimer: null,
 //           };
 //           room.spectatorIds.delete(socket.id);
 //         }
@@ -288,6 +434,7 @@
 //         persona: room.persona,
 //         durationSeconds: room.durationSeconds,
 //         stakeAmount: room.stakeAmount || '0.005',
+//         auditLog: room.auditLog,
 //         result: room.result,
 //       });
 //     });
@@ -306,6 +453,7 @@
 //         persona: room.persona,
 //         durationSeconds: room.durationSeconds,
 //         stakeAmount: room.stakeAmount,
+//         auditLog: room.auditLog,
 //         result: room.result,
 //       });
 //     });
@@ -332,6 +480,7 @@
 //         persona: room.persona,
 //         durationSeconds: room.durationSeconds,
 //         stakeAmount: room.stakeAmount || '0.005',
+//         auditLog: room.auditLog,
 //         result: room.result,
 //       });
 //     });
@@ -362,6 +511,9 @@
 //         starterCode: room.problem.starterCode,
 //         submitted: false,
 //         lastAction: 'idle',
+//         tabSwitchCount: 0,
+//         isTabAway: false,
+//         tabSwitchTimer: null,
 //       };
 
 //       await checkAndStartBattle(io, room);
@@ -386,7 +538,94 @@
 //       await checkAndStartBattle(io, room);
 //     });
 
-//     // 7. Code Update
+//     // 7. 🛡️ ANTI-CHEAT: TAB / WINDOW SWITCH DETECTED
+//     socket.on('anti_cheat_tab_switch', ({ roomId }) => {
+//       const room = rooms.get(roomId);
+//       if (!room || room.battleState !== 'in-progress' || !room.players[socket.id]) return;
+
+//       const player = room.players[socket.id];
+//       if (player.submitted || player.isBot) return;
+
+//       // Prevent duplicate triggers if already marked as tabbed away
+//       if (player.isTabAway) return;
+//       player.isTabAway = true;
+//       player.tabSwitchCount = (player.tabSwitchCount || 0) + 1;
+
+//       // FIRST TAB SWITCH: 5-Second Warning Grace Period
+//       if (player.tabSwitchCount === 1) {
+//         recordAuditEvent(room, 'TAB_SWITCH_DETECTED', player, {
+//           switchCount: 1,
+//           action: '5_second_grace_period_granted',
+//         });
+
+//         // Notify client to trigger countdown warning overlay
+//         socket.emit('anti_cheat_warning', {
+//           countdown: 5,
+//           playerSlot: player.slot,
+//           switchCount: 1,
+//         });
+
+//         // Broadcast to spectators and opponent ticker
+//         socket.to(roomId).emit('ai_commentary', {
+//           text: `⚠️ ANTI-CHEAT: ${player.slot.toUpperCase()} lost window focus (First warning)!`,
+//           timestamp: Date.now(),
+//         });
+
+//         // Server-side termination timer: strictly 5.5s timeout safety
+//         if (player.tabSwitchTimer) clearTimeout(player.tabSwitchTimer);
+//         player.tabSwitchTimer = setTimeout(() => {
+//           if (room.battleState === 'in-progress' && player.isTabAway) {
+//             terminateBattleForCheating(
+//               io,
+//               room,
+//               player,
+//               'TAB_SWITCH_TIMEOUT',
+//               'Failed to return within the 5-second grace window after switching tabs'
+//             );
+//           }
+//         }, 5500);
+//       } 
+//       // SECOND TAB SWITCH: Immediate Disqualification (No 2nd Grace Period!)
+//       else if (player.tabSwitchCount >= 2) {
+//         terminateBattleForCheating(
+//           io,
+//           room,
+//           player,
+//           'SECOND_TAB_SWITCH',
+//           'Disqualified for 2nd tab/window switch violation during active combat'
+//         );
+//       }
+//     });
+
+//     // 8. 🛡️ ANTI-CHEAT: FOCUS RETURNED SAFELY
+//     socket.on('anti_cheat_focus_returned', ({ roomId }) => {
+//       const room = rooms.get(roomId);
+//       if (!room || room.battleState !== 'in-progress' || !room.players[socket.id]) return;
+
+//       const player = room.players[socket.id];
+//       if (!player.isTabAway || player.submitted) return;
+
+//       // Cancel countdown timer
+//       if (player.tabSwitchTimer) {
+//         clearTimeout(player.tabSwitchTimer);
+//         player.tabSwitchTimer = null;
+//       }
+
+//       player.isTabAway = false;
+
+//       recordAuditEvent(room, 'FOCUS_RETURNED', player, {
+//         switchCount: player.tabSwitchCount,
+//         status: 'resumed_normally',
+//       });
+
+//       // Resume on client
+//       socket.emit('anti_cheat_resumed', {
+//         playerSlot: player.slot,
+//         switchCount: player.tabSwitchCount,
+//       });
+//     });
+
+//     // 9. Code Update
 //     socket.on('code_update', async ({ roomId, code, language }) => {
 //       const room = rooms.get(roomId);
 //       if (!room || !room.players[socket.id] || room.battleState !== 'in-progress') return;
@@ -419,7 +658,7 @@
 //       }
 //     });
 
-//     // 8. Submit Code
+//     // 10. Submit Code
 //     socket.on('submit_code', async ({ roomId, code, language, starterCode }) => {
 //       const room = rooms.get(roomId);
 //       if (!room || !room.players[socket.id]) return;
@@ -430,6 +669,18 @@
 //       if (starterCode) player.starterCode = starterCode;
 //       player.submitted = true;
 
+//       // Clear any tab timers
+//       if (player.tabSwitchTimer) {
+//         clearTimeout(player.tabSwitchTimer);
+//         player.tabSwitchTimer = null;
+//       }
+//       player.isTabAway = false;
+
+//       recordAuditEvent(room, 'CODE_SUBMITTED', player, {
+//         language: player.language,
+//         codeLength: code.length,
+//       });
+
 //       io.to(roomId).emit('room_state', {
 //         roomId: room.roomId,
 //         problem: room.problem,
@@ -439,6 +690,7 @@
 //         persona: room.persona,
 //         durationSeconds: room.durationSeconds,
 //         stakeAmount: room.stakeAmount || '0.005',
+//         auditLog: room.auditLog,
 //         result: room.result,
 //       });
 
@@ -453,7 +705,7 @@
 //       checkBattleCompletion(io, room);
 //     });
 
-//     // 9. Reactions & Disconnect
+//     // 11. Reactions & Disconnect
 //     socket.on('send_reaction', ({ roomId, emoji }) => {
 //       io.to(roomId).emit('floating_reaction', {
 //         id: Math.random().toString(36).substring(2, 9),
@@ -468,6 +720,10 @@
 //           room.spectatorIds.delete(socket.id);
 //         }
 //         if (room.players[socket.id]) {
+//           const departingPlayer = room.players[socket.id];
+//           if (departingPlayer.tabSwitchTimer) {
+//             clearTimeout(departingPlayer.tabSwitchTimer);
+//           }
 //           delete room.players[socket.id];
 //           const remainingHumans = Object.values(room.players).filter((p) => !p.isBot);
 //           if (remainingHumans.length === 0) {
@@ -480,6 +736,7 @@
 // }
 
 // export { rooms };
+
 
 
 import fs from 'fs';
@@ -645,7 +902,7 @@ async function checkAndStartBattle(io, room) {
   });
 }
 
-// 🚨 TERMINATE BATTLE DUE TO ANTI-CHEAT VIOLATION
+// 🚨 TERMINATE BATTLE DUE TO ANTI-CHEAT VIOLATION (WITH ON-CHAIN PRIZE UNLOCK)
 async function terminateBattleForCheating(io, room, disqualifiedPlayer, reasonType, reasonMessage) {
   if (room.battleState !== 'in-progress') return;
 
@@ -671,14 +928,42 @@ async function terminateBattleForCheating(io, room, disqualifiedPlayer, reasonTy
   const opponent = playerList.find((p) => p.id !== disqualifiedPlayer.id) || disqualifiedPlayer;
   const isP1Disqualified = disqualifiedPlayer.slot === 'player1';
 
-  // Build Disqualification Result Payload with code preservation
+  // 💰 ON-CHAIN SETTLEMENT FOR WINNER BY DEFAULT
+  let payoutTxHash = null;
+  const hasBot = playerList.some((p) => p.isBot);
+  const isRealWinner = opponent.walletAddress && opponent.walletAddress.startsWith('0x') && opponent.walletAddress !== 'DRAW';
+  const payoutAmount = hasBot ? '0' : (parseFloat(room.stakeAmount || '0.005') * 2).toFixed(3);
+
+  if (refereeContract && isRealWinner && !hasBot && parseFloat(room.stakeAmount || '0') > 0) {
+    try {
+      console.log(`⛓️ [SETTLEMENT] Settling disqualification victory for ${opponent.walletAddress}...`);
+      const tx = await refereeContract.settleBattle(
+        room.roomId,
+        opponent.walletAddress,
+        room.problem?.title || 'Anti-Cheat Disqualification Match',
+        100, // Winner gets 100 pts on default victory
+        `ipfs://badge/${room.roomId}`
+      );
+      payoutTxHash = tx.hash;
+      console.log(`✅ [SETTLEMENT] On-chain battle settled successfully! TxHash: ${payoutTxHash}`);
+    } catch (err) {
+      console.warn('⚠️ On-chain settlement for disqualification skipped or failed:', err.message);
+    }
+  }
+
+  // Build Disqualification Result Payload with full payout options enabled
   const terminationResult = {
+    roomId: room.roomId,
     winnerAddress: opponent.walletAddress,
     isDisqualified: true,
     disqualifiedPlayerAddress: disqualifiedPlayer.walletAddress,
     reasoning: `BATTLE TERMINATED: ${disqualifiedPlayer.walletAddress.substring(0, 6)} was disqualified for anti-cheat violation (${reasonMessage}).`,
     comparisonAnalysis: `Opponent ${opponent.walletAddress.substring(0, 6)} was awarded victory by referee disqualification ruling.`,
     auditLog: room.auditLog,
+    payoutAmount: payoutAmount,
+    payoutTxHash: payoutTxHash,
+    stakeAmount: room.stakeAmount || '0.005',
+    canClaimPrize: !hasBot && parseFloat(room.stakeAmount || '0') > 0,
     scores: {
       player1: {
         address: p1.walletAddress,
@@ -805,6 +1090,8 @@ async function checkBattleCompletion(io, room) {
     aiVerdict.payoutTxHash = payoutTxHash;
     aiVerdict.payoutAmount = hasBot ? '0' : (parseFloat(room.stakeAmount || '0.005') * 2).toFixed(3);
     aiVerdict.auditLog = room.auditLog;
+    aiVerdict.canClaimPrize = !hasBot && parseFloat(room.stakeAmount || '0') > 0;
+    aiVerdict.roomId = room.roomId;
 
     recordAuditEvent(room, 'BATTLE_COMPLETED_NORMALLY', null, {
       winner: aiVerdict.winnerAddress,
