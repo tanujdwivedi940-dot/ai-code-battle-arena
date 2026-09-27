@@ -807,7 +807,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
   const { writeContract: writeNftMint, data: nftTxHash, isPending: isMintingNft } = useWriteContract();
   const { isLoading: isWaitingNftTx, isSuccess: isNftMintSuccess } = useWaitForTransactionReceipt({ hash: nftTxHash });
 
-  // Manual fallback prize claim (only needed if referee relayer was skipped)
+  // Fallback prize claim (only used if referee relayer was skipped/offline)
   const { writeContract: writePrizeClaim, data: manualPrizeTxHash, isPending: isClaimingPrize, error: claimError } = useWriteContract();
   const { isLoading: isWaitingPrizeTx, isSuccess: isPrizeClaimSuccess } = useWaitForTransactionReceipt({ hash: manualPrizeTxHash });
 
@@ -830,7 +830,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
   const hasRealPayout = (parseFloat(result.payoutAmount || '0') > 0) || Boolean(result.canClaimPrize);
   const displayPayoutAmount = (result.payoutAmount && parseFloat(result.payoutAmount) > 0) ? result.payoutAmount : '0.010';
 
-  // 🔑 If the referee already settled on-chain, POL was ALREADY sent directly to the winner's wallet!
+  // 🔑 If the referee already settled on-chain, POL was ALREADY sent directly to the winner's wallet
   const isAutoPaidByReferee = Boolean(result.payoutTxHash);
 
   useEffect(() => {
@@ -844,15 +844,24 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
     }
   }, [isUserWinner, isDraw]);
 
+  // Clean room ID helper
+  const getCleanRoomId = () => {
+    const rawId = result.roomId || window.location.pathname.split('/').pop() || '';
+    return decodeURIComponent(rawId).split('?')[0].trim();
+  };
+
   const handleManualClaimPrize = () => {
     if (!address) return;
     try {
-      const activeRoomId = result.roomId || window.location.pathname.split('/').pop()?.split('?')[0] || '';
+      const cleanRoomId = getCleanRoomId();
+      console.log('Claiming prize for clean roomId:', cleanRoomId);
+
       writePrizeClaim({
         address: BATTLE_ARENA_ADDRESS,
         abi: BATTLE_ARENA_ABI,
         functionName: 'claimPrize',
-        args: [activeRoomId],
+        args: [cleanRoomId],
+        gas: 250000n, // Explicit gas buffer for Polygon native transfers
       } as any);
     } catch (err) {
       console.error('Manual Claim Prize Error:', err);
@@ -862,15 +871,18 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
   const handleClaimSoulboundBadge = () => {
     if (!address) return;
     try {
+      const cleanRoomId = getCleanRoomId();
+
       writeNftMint({
         address: REPUTATION_NFT_ADDRESS,
         abi: REPUTATION_NFT_ABI,
         functionName: 'claimBadge',
         args: [
-          `ipfs://badge/${result.scores?.player1?.total || 90}`,
+          `ipfs://badge/${cleanRoomId}`,
           '1v1 Algorithmic Battle Arena',
           BigInt(myScore.total || 90)
         ],
+        gas: 300000n,
       } as any);
     } catch (err) {
       console.error('Claim Badge Error:', err);
@@ -987,7 +999,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
 
               <div className="flex items-center space-x-2 shrink-0">
                 
-                {/* If Auto-Paid by referee, show Green Verified badge (NO failing manual claim button needed!) */}
+                {/* If Auto-Paid by referee, show Green Verified badge (prevents duplicate failing calls) */}
                 {isAutoPaidByReferee ? (
                   <span className="text-cp-success text-xs font-bold flex items-center space-x-1 bg-cp-success/10 px-3 py-1.5 rounded-lg border border-cp-success/30">
                     <CheckCircle2 className="w-3.5 h-3.5" />
