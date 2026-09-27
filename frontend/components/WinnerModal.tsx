@@ -733,6 +733,7 @@ import {
   Loader2,
   ShieldCheck,
   AlertOctagon,
+  Clock,
   ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
@@ -807,9 +808,9 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
   const { writeContract: writeNftMint, data: nftTxHash, isPending: isMintingNft } = useWriteContract();
   const { isLoading: isWaitingNftTx, isSuccess: isNftMintSuccess } = useWaitForTransactionReceipt({ hash: nftTxHash });
 
-  // Manual fallback prize claim (only needed if referee relayer was skipped)
-  const { writeContract: writePrizeClaim, data: manualPrizeTxHash, isPending: isClaimingPrize, error: claimError } = useWriteContract();
-  const { isLoading: isWaitingPrizeTx, isSuccess: isPrizeClaimSuccess } = useWaitForTransactionReceipt({ hash: manualPrizeTxHash });
+  // POL Escrow Prize Claim
+  const { writeContract: writePrizeClaim, data: prizeTxHash, isPending: isClaimingPrize, error: claimError } = useWriteContract();
+  const { isLoading: isWaitingPrizeTx, isSuccess: isPrizeClaimSuccess } = useWaitForTransactionReceipt({ hash: prizeTxHash });
 
   const p1 = result.scores?.player1 || { address: '', correctness: 0, total: 0, feedback: '' };
   const p2 = result.scores?.player2 || { address: '', correctness: 0, total: 0, feedback: '' };
@@ -821,17 +822,16 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
   const currentWallet = (userAddress || address || '').toLowerCase();
   const isDraw = result.winnerAddress?.toUpperCase() === 'DRAW';
 
+  // 🛡️ Robust winner resolution: checks winner address, mySlot, or disqualified opponent address
   const isUserWinner = !isDraw && Boolean(
     (currentWallet && result.winnerAddress?.toLowerCase() === currentWallet) ||
     (mySlot && myScore?.address && result.winnerAddress?.toLowerCase() === myScore.address.toLowerCase()) ||
     (result.isDisqualified && result.disqualifiedPlayerAddress && currentWallet && result.disqualifiedPlayerAddress.toLowerCase() !== currentWallet)
   );
 
+  // 💰 Enable payout button if payoutAmount > 0 OR canClaimPrize flag is set
   const hasRealPayout = (parseFloat(result.payoutAmount || '0') > 0) || Boolean(result.canClaimPrize);
   const displayPayoutAmount = (result.payoutAmount && parseFloat(result.payoutAmount) > 0) ? result.payoutAmount : '0.010';
-
-  // 🔑 If the referee already settled on-chain, POL was ALREADY sent directly to the winner's wallet!
-  const isAutoPaidByReferee = Boolean(result.payoutTxHash);
 
   useEffect(() => {
     if (isUserWinner) {
@@ -844,7 +844,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
     }
   }, [isUserWinner, isDraw]);
 
-  const handleManualClaimPrize = () => {
+  const handleClaimPrizePool = () => {
     if (!address) return;
     try {
       const activeRoomId = result.roomId || window.location.pathname.split('/').pop()?.split('?')[0] || '';
@@ -855,7 +855,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
         args: [activeRoomId],
       } as any);
     } catch (err) {
-      console.error('Manual Claim Prize Error:', err);
+      console.error('Claim Prize Error:', err);
     }
   };
 
@@ -935,7 +935,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
             {isDraw ? 'Result: Tied Match' : `Winner: ${result.winnerAddress}`}
           </p>
 
-          {/* Disqualification Banner */}
+          {/* 🛡️ Disqualification Banner if match ended via Anti-Cheat */}
           {result.isDisqualified && (
             <div className="mt-2.5 px-3 py-1.5 rounded-lg bg-cp-error/10 border border-cp-error/30 text-xs text-cp-error font-medium inline-flex items-center gap-1.5">
               <AlertOctagon className="w-3.5 h-3.5" />
@@ -943,76 +943,58 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
             </div>
           )}
 
-          {/* 💰 Reward Banner */}
+          {/* 💰 Reward & Withdraw POL Banner */}
           {isUserWinner && (
             <div className="mt-3 p-3.5 rounded-xl bg-cp-bg border border-cp-border max-w-xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-left shadow-sm">
               <div>
                 <div className="flex items-center space-x-1.5 text-cp-heading text-xs font-semibold">
                   {hasRealPayout ? <Coins className="w-4 h-4 text-cp-accent" /> : <Award className="w-4 h-4 text-cp-blue" />}
                   <span className="text-sm font-bold text-cp-heading">
-                    {hasRealPayout ? `+${displayPayoutAmount} POL Prize Awarded` : 'Victory Trophy Available'}
+                    {hasRealPayout ? `+${displayPayoutAmount} POL Prize Available` : 'Victory Trophy Available'}
                   </span>
                 </div>
-                
-                {/* STATUS EXPLANATION */}
                 <p className="text-[11px] text-cp-muted mt-0.5">
-                  {isAutoPaidByReferee ? (
-                    <span className="text-cp-success font-medium">
-                      ✅ Prize transferred directly to your wallet via Referee Relayer!
-                    </span>
-                  ) : isPrizeClaimSuccess ? (
-                    <span className="text-cp-success font-medium">
-                      ✅ POL successfully withdrawn to your wallet!
-                    </span>
-                  ) : hasRealPayout ? (
-                    'Referee relayer offline. Click below to withdraw directly from contract escrow.'
-                  ) : (
-                    'Claim your non-transferable Soulbound NFT badge on Polygon Amoy.'
-                  )}
+                  {isPrizeClaimSuccess
+                    ? '✅ POL prize successfully transferred to your wallet!'
+                    : hasRealPayout
+                    ? 'Click below to withdraw your pooled stake from Polygon Amoy escrow.'
+                    : 'Claim your non-transferable Soulbound NFT badge on Polygon Amoy.'}
                 </p>
-
-                {/* VIEW ON POLYGONSCAN LINK */}
-                {result.payoutTxHash && (
-                  <a
-                    href={`https://amoy.polygonscan.com/tx/${result.payoutTxHash}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center space-x-1 text-[10px] text-cp-blue hover:underline mt-1 font-mono"
-                  >
-                    <span>View Payout on Polygonscan</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
+                {claimError && (
+                  <p className="text-[10px] text-cp-error mt-1">
+                    {claimError.message.includes('User rejected') ? 'Transaction cancelled in wallet.' : 'Withdrawal error. Check console.'}
+                  </p>
                 )}
               </div>
 
               <div className="flex items-center space-x-2 shrink-0">
-                
-                {/* If Auto-Paid by referee, show Green Verified badge (NO failing manual claim button needed!) */}
-                {isAutoPaidByReferee ? (
-                  <span className="text-cp-success text-xs font-bold flex items-center space-x-1 bg-cp-success/10 px-3 py-1.5 rounded-lg border border-cp-success/30">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>POL Received</span>
-                  </span>
-                ) : hasRealPayout && !isPrizeClaimSuccess ? (
-                  /* Fallback manual button if referee relayer was skipped */
-                  <button
-                    onClick={handleManualClaimPrize}
-                    disabled={isClaimingPrize || isWaitingPrizeTx}
-                    className="bg-cp-accent hover:bg-cp-accent/90 text-black px-3.5 py-2 rounded-lg text-xs font-extrabold cursor-pointer transition shadow-md active:scale-95 disabled:opacity-50 flex items-center space-x-1.5"
-                  >
-                    {isClaimingPrize || isWaitingPrizeTx ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Withdrawing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Coins className="w-3.5 h-3.5 text-black" />
-                        <span>Withdraw POL</span>
-                      </>
-                    )}
-                  </button>
-                ) : null}
+                {/* ⚡ WITHDRAW POL BUTTON */}
+                {hasRealPayout && (
+                  isPrizeClaimSuccess ? (
+                    <span className="text-cp-success text-xs font-bold flex items-center space-x-1 bg-cp-success/10 px-3 py-1.5 rounded-lg border border-cp-success/30">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>POL Claimed</span>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={handleClaimPrizePool}
+                      disabled={isClaimingPrize || isWaitingPrizeTx}
+                      className="bg-cp-accent hover:bg-cp-accent/90 text-black px-3.5 py-2 rounded-lg text-xs font-extrabold cursor-pointer transition shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1.5"
+                    >
+                      {isClaimingPrize || isWaitingPrizeTx ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Withdrawing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Coins className="w-3.5 h-3.5 text-black" />
+                          <span>Withdraw POL</span>
+                        </>
+                      )}
+                    </button>
+                  )
+                )}
 
                 {/* SOULBOUND NFT BADGE BUTTON */}
                 {isNftMintSuccess ? (
@@ -1082,6 +1064,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                 <span>Mistakes</span>
               </button>
 
+              {/* 🛡️ ANTI-CHEAT AUDIT TIMELINE TAB */}
               <button
                 onClick={() => setActiveTab('auditLog')}
                 className={`px-3 py-1 rounded-lg transition flex items-center space-x-1 ${
@@ -1270,10 +1253,12 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
           </div>
         )}
 
-        {/* TAB 2: CODE DIFF */}
+        {/* TAB 2: CODE DIFF (PRESERVES SUBMITTED CODES) */}
         {activeTab === 'viewCodes' && (
           <div className="space-y-3 pt-3 text-left font-mono">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              
+              {/* YOUR SUBMITTED CODE */}
               <div className="bg-cp-bg border border-cp-border p-3.5 rounded-xl flex flex-col justify-between">
                 <div className="flex items-center justify-between pb-2 border-b border-cp-border mb-2.5">
                   <span className="text-xs font-bold text-cp-blue uppercase">Your Code ({myScore.language || 'C'})</span>
@@ -1290,6 +1275,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
                 </div>
               </div>
 
+              {/* OPPONENT'S SUBMITTED CODE */}
               <div className="bg-cp-bg border border-cp-border p-3.5 rounded-xl flex flex-col justify-between">
                 <div className="flex items-center justify-between pb-2 border-b border-cp-border mb-2.5">
                   <span className="text-xs font-bold text-cp-accent uppercase">Opponent Code ({opponentScore.language || 'JS'})</span>
@@ -1368,7 +1354,7 @@ export default function WinnerModal({ result, userAddress, mySlot }: WinnerModal
           </div>
         )}
 
-        {/* TAB 4: ANTI-CHEAT AUDIT TIMELINE */}
+        {/* 🛡️ TAB 4: ANTI-CHEAT AUDIT TIMELINE */}
         {activeTab === 'auditLog' && (
           <div className="space-y-3 pt-3 text-left font-mono">
             <div className="p-3 bg-cp-bg border border-cp-border rounded-xl">
